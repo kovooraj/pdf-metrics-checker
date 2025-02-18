@@ -149,7 +149,7 @@ const Index = () => {
       setIsProcessing(false);
     }
   };
-  return <div className="min-h-screen py-12 px-4 sm:px-6 lg:px-8 bg-blue-200 hover:bg-blue-100">
+  return <div className="min-h-screen py-12 px-4 sm:px-6 lg:px-8 bg-slate-100">
       <div className="max-w-3xl mx-auto space-y-8">
         <div className="text-center">
           <h1 className="text-3xl text-gray-900 font-bold">PDF Preflight Tool</h1>
