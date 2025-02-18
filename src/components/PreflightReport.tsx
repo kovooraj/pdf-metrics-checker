@@ -75,19 +75,19 @@ const PreflightReport = ({ result }: PreflightReportProps) => {
               </p>
             </div>
             <div>
-              <p className="text-gray-500">Actual (with bleed)</p>
+              <p className="text-gray-500">Detected Trim flat size</p>
               <p>
                 {result.dimensions.actualWithBleed.width.toFixed(3)}" × {result.dimensions.actualWithBleed.height.toFixed(3)}"
-                {result.dimensions.isValid && (
+                {result.dimensions.isValid && result.dimensions.bleedSize > 0 && (
                   <span className="text-gray-500 block">
-                    ({result.dimensions.bleedSize}" bleed)
+                    (bleed detected ({result.dimensions.bleedSize}"))
                   </span>
                 )}
               </p>
             </div>
           </div>
           {!result.dimensions.isValid && result.dimensions.error && (
-            <p className="text-error text-sm">{result.dimensions.error}</p>
+            <p className="text-error text-sm whitespace-pre-line">{result.dimensions.error}</p>
           )}
         </div>
 
