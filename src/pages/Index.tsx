@@ -20,7 +20,8 @@ const Index = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
 
-  const BLEED_SIZE = 0.125; // 1/8 inch bleed
+  // Define bleed sizes
+  const BLEED_SIZES = [0.125, 0.0625]; // 1/8 inch and 1/16 inch bleeds
   const MIN_DPI = 300;
 
   const validatePageCount = (actual: number, expected: string) => {
@@ -67,46 +68,62 @@ const Index = () => {
       const actualWidth = firstPage.getWidth() / 72;
       const actualHeight = firstPage.getHeight() / 72;
       
-      // Calculate width/height with bleed
-      const actualWidthWithBleed = actualWidth - (BLEED_SIZE * 2);
-      const actualHeightWithBleed = actualHeight - (BLEED_SIZE * 2);
-      
       const expectedWidth = parseFloat(width);
       const expectedHeight = parseFloat(height);
       
-      // Allow for small rounding differences (0.01 inches)
-      const dimensionsMatch =
-        Math.abs(actualWidthWithBleed - expectedWidth) <= 0.01 &&
-        Math.abs(actualHeightWithBleed - expectedHeight) <= 0.01;
+      // Check dimensions against both bleed sizes
+      let dimensionsMatch = false;
+      let actualWithBleed = { width: actualWidth, height: actualHeight };
+      let usedBleedSize = 0;
+
+      for (const bleedSize of BLEED_SIZES) {
+        const widthWithBleed = actualWidth - (bleedSize * 2);
+        const heightWithBleed = actualHeight - (bleedSize * 2);
+        
+        if (
+          Math.abs(widthWithBleed - expectedWidth) <= 0.01 &&
+          Math.abs(heightWithBleed - expectedHeight) <= 0.01
+        ) {
+          dimensionsMatch = true;
+          actualWithBleed = { width: widthWithBleed, height: heightWithBleed };
+          usedBleedSize = bleedSize;
+          break;
+        }
+      }
 
       const pageCountMatch = validatePageCount(pages.length, pageCount);
 
       // In a real implementation, these would be actual checks against the PDF
-      // For now, we'll simulate these checks
       const simulatedResult: PreflightResult = {
         dimensions: {
           expected: { width: expectedWidth, height: expectedHeight },
           actual: { width: actualWidth, height: actualHeight },
-          actualWithBleed: { width: actualWidthWithBleed, height: actualHeightWithBleed },
+          actualWithBleed: actualWithBleed,
+          bleedSize: usedBleedSize,
           isValid: dimensionsMatch,
+          error: dimensionsMatch ? null : `Expected size: ${expectedWidth}" × ${expectedHeight}". Please ensure your PDF includes either a 0.125" or 0.0625" bleed on all sides.`
         },
         pageCount: {
           expected: pageCount,
           actual: pages.length,
           isValid: pageCountMatch,
+          error: pageCountMatch ? null : `Expected ${pageCount === "1" ? "1 page" : pageCount === "2" ? "2 pages" : "2 or more pages"}, but found ${pages.length} pages.`
         },
         colorSpace: {
           isRGB: false,
           isCMYK: true,
-          isValid: true, // CMYK is valid for print
+          isValid: true,
+          error: null
         },
         resolution: {
           dpi: 300,
           isValid: true,
+          error: null
         },
         fonts: {
           hasUnoutlinedFonts: false,
           isValid: true,
+          error: null
         },
       };
 

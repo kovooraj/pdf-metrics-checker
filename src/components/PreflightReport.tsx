@@ -7,25 +7,31 @@ export interface PreflightResult {
     expected: { width: number; height: number };
     actual: { width: number; height: number };
     actualWithBleed: { width: number; height: number };
+    bleedSize: number;
     isValid: boolean;
+    error: string | null;
   };
   pageCount: {
     expected: string;
     actual: number;
     isValid: boolean;
+    error: string | null;
   };
   colorSpace: {
     isRGB: boolean;
     isCMYK: boolean;
     isValid: boolean;
+    error: string | null;
   };
   resolution: {
     dpi: number;
     isValid: boolean;
+    error: string | null;
   };
   fonts: {
     hasUnoutlinedFonts: boolean;
     isValid: boolean;
+    error: string | null;
   };
 }
 
@@ -72,11 +78,16 @@ const PreflightReport = ({ result }: PreflightReportProps) => {
               <p className="text-gray-500">Actual (with bleed)</p>
               <p>
                 {result.dimensions.actualWithBleed.width.toFixed(3)}" × {result.dimensions.actualWithBleed.height.toFixed(3)}"
+                {result.dimensions.isValid && (
+                  <span className="text-gray-500 block">
+                    ({result.dimensions.bleedSize}" bleed)
+                  </span>
+                )}
               </p>
             </div>
           </div>
-          {!result.dimensions.isValid && (
-            <p className="text-error text-sm">Dimensions do not match the expected size (including 0.125" bleed)</p>
+          {!result.dimensions.isValid && result.dimensions.error && (
+            <p className="text-error text-sm">{result.dimensions.error}</p>
           )}
         </div>
 
@@ -92,8 +103,8 @@ const PreflightReport = ({ result }: PreflightReportProps) => {
               <p>{result.pageCount.actual} pages</p>
             </div>
           </div>
-          {!result.pageCount.isValid && (
-            <p className="text-error text-sm">Page count does not match the expected count</p>
+          {!result.pageCount.isValid && result.pageCount.error && (
+            <p className="text-error text-sm">{result.pageCount.error}</p>
           )}
         </div>
 
@@ -104,8 +115,8 @@ const PreflightReport = ({ result }: PreflightReportProps) => {
               {result.colorSpace.isCMYK ? "CMYK" : result.colorSpace.isRGB ? "RGB" : "Unknown"}
             </p>
           </div>
-          {!result.colorSpace.isValid && (
-            <p className="text-error text-sm">Document should be in CMYK color space</p>
+          {!result.colorSpace.isValid && result.colorSpace.error && (
+            <p className="text-error text-sm">{result.colorSpace.error}</p>
           )}
         </div>
 
@@ -114,8 +125,8 @@ const PreflightReport = ({ result }: PreflightReportProps) => {
           <div className="text-sm">
             <p>{result.resolution.dpi} DPI</p>
           </div>
-          {!result.resolution.isValid && (
-            <p className="text-error text-sm">Resolution should be at least 300 DPI</p>
+          {!result.resolution.isValid && result.resolution.error && (
+            <p className="text-error text-sm">{result.resolution.error}</p>
           )}
         </div>
 
@@ -124,8 +135,8 @@ const PreflightReport = ({ result }: PreflightReportProps) => {
           <div className="text-sm">
             <p>{result.fonts.hasUnoutlinedFonts ? "Unoutlined fonts detected" : "All fonts outlined"}</p>
           </div>
-          {!result.fonts.isValid && (
-            <p className="text-error text-sm">All fonts should be outlined or rasterized</p>
+          {!result.fonts.isValid && result.fonts.error && (
+            <p className="text-error text-sm">{result.fonts.error}</p>
           )}
         </div>
       </div>
