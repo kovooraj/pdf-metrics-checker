@@ -91,6 +91,21 @@ const Index = () => {
         }
       }
 
+      // Calculate dimensions with recommended bleed
+      const recommendedBleed = 0.125; // 1/8 inch
+      const widthWithRecommendedBleed = expectedWidth + (recommendedBleed * 2);
+      const heightWithRecommendedBleed = expectedHeight + (recommendedBleed * 2);
+      const minBleed = 0.0625; // 1/16 inch
+      const widthWithMinBleed = expectedWidth + (minBleed * 2);
+      const heightWithMinBleed = expectedHeight + (minBleed * 2);
+
+      const dimensionsError = dimensionsMatch ? null : 
+        `The file received is ${actualWidth.toFixed(3)}" × ${actualHeight.toFixed(3)}", ` +
+        `but you need to provide a file that is ${expectedWidth}" × ${expectedHeight}" with a minimum bleed of ${minBleed}", ` +
+        `but we recommend ${recommendedBleed}" all around. This means your PDF file should be either:\n\n` +
+        `• ${widthWithRecommendedBleed.toFixed(3)}" × ${heightWithRecommendedBleed.toFixed(3)}" (recommended ${recommendedBleed}" bleed)\n` +
+        `• ${widthWithMinBleed.toFixed(3)}" × ${heightWithMinBleed.toFixed(3)}" (minimum ${minBleed}" bleed)`;
+
       const pageCountMatch = validatePageCount(pages.length, pageCount);
 
       // In a real implementation, these would be actual checks against the PDF
@@ -101,7 +116,7 @@ const Index = () => {
           actualWithBleed: actualWithBleed,
           bleedSize: usedBleedSize,
           isValid: dimensionsMatch,
-          error: dimensionsMatch ? null : `Expected size: ${expectedWidth}" × ${expectedHeight}". Please ensure your PDF includes either a 0.125" or 0.0625" bleed on all sides.`
+          error: dimensionsError
         },
         pageCount: {
           expected: pageCount,
