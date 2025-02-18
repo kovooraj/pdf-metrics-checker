@@ -153,9 +153,7 @@ const Index = () => {
       <div className="max-w-3xl mx-auto space-y-8">
         <div className="text-center">
           <h1 className="text-3xl text-gray-900 font-bold">PDF Preflight Tool</h1>
-          <p className="mt-2 text-gray-600">
-            Verify your PDF dimensions and specifications
-          </p>
+          <p className="mt-2 text-gray-600">Verify your PDF dimensions and specifications - Built by Alex Kovoor</p>
         </div>
 
         <Card className="p-6 space-y-6 bg-white shadow-sm">
