@@ -70,12 +70,12 @@ const Index = () => {
         throw new Error("Could not determine document dimensions");
       }
 
-      // Get the coordinates from the PDFArray and convert them to numbers
+      // Get the coordinates from the PDFArray and convert them to numbers using a safer approach
       const coords = box.asArray();
-      const x1 = coords[0].asNumber();
-      const y1 = coords[1].asNumber();
-      const x2 = coords[2].asNumber();
-      const y2 = coords[3].asNumber();
+      const x1 = parseFloat(coords[0].toString());
+      const y1 = parseFloat(coords[1].toString());
+      const x2 = parseFloat(coords[2].toString());
+      const y2 = parseFloat(coords[3].toString());
 
       // Calculate width and height in points, then convert to inches (1 point = 1/72 inch)
       const trimWidth = (x2 - x1) / 72;
