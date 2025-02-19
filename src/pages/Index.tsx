@@ -46,6 +46,52 @@ const Index = () => {
       description: file.name
     });
   };
+  
+  const detectSpotColors = (pdfDoc: PDFDocument) => {
+    const spotColors: string[] = [];
+    let hasWhiteInk = false;
+    
+    // Get all pages
+    const pages = pdfDoc.getPages();
+    
+    // Iterate through each page
+    for (const page of pages) {
+      // Access the page's content stream
+      const contentStream = page.node.Contents();
+      if (!contentStream) continue;
+      
+      // Get the resources dictionary
+      const resources = page.node.Resources();
+      if (!resources) continue;
+
+      // Check ColorSpace dictionary in resources
+      const colorSpaceDict = resources.lookup('ColorSpace');
+      if (!colorSpaceDict) continue;
+
+      // Iterate through the ColorSpace dictionary
+      const entries = colorSpaceDict.entries();
+      for (const [_, colorSpace] of entries) {
+        // Check if it's a Separation color space (spot color)
+        if (colorSpace instanceof Array && colorSpace.length > 1) {
+          const colorSpaceType = colorSpace[0];
+          if (colorSpaceType?.toString() === '/Separation') {
+            // Get the name of the spot color
+            const spotColorName = colorSpace[1]?.toString()?.replace('/', '');
+            if (spotColorName && !spotColors.includes(spotColorName)) {
+              spotColors.push(spotColorName);
+              // Check for white ink specifically
+              if (spotColorName.toLowerCase().includes('white')) {
+                hasWhiteInk = true;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    return { spotColors, hasWhiteInk };
+  };
+
   const handleSubmit = async () => {
     if (!selectedFile || !width || !height || !pageCount || !colorProfile || !hasDieline) {
       toast({
@@ -114,25 +160,32 @@ const Index = () => {
 
       const pageCountMatch = validatePageCount(pages.length, pageCount);
 
-      // Get actual spot colors from the PDF
-      // For now, we'll set an empty array since we need actual PDF parsing for spot colors
-      const spotColors: string[] = [];
-      const hasWhiteInk = false; // This should be determined by actual PDF inspection
+      // Detect spot colors and white ink
+      const { spotColors, hasWhiteInk } = detectSpotColors(pdfDoc);
+      console.log('Detected spot colors:', spotColors);
+      console.log('Has white ink:', hasWhiteInk);
 
       let colorSpaceError = null;
       let colorSpaceValid = true;
 
-      // Validate color profile
+      // Validate color profile with actual detected colors
       if (colorProfile === "CMYK+WHITE" && !hasWhiteInk) {
         colorSpaceValid = false;
         colorSpaceError = "White ink color not found in the file";
       } else if (colorProfile === "WHITE_ONLY" && (!hasWhiteInk || spotColors.length > 1)) {
         colorSpaceValid = false;
         colorSpaceError = "File contains colors other than white ink";
+      } else if (colorProfile === "CMYK+PANTONE" && spotColors.length === 0) {
+        colorSpaceValid = false;
+        colorSpaceError = "No spot colors (Pantone) found in the file";
       }
 
-      // Dieline validation - only check for exact "Dieline" spot color
-      const hasDielineSpotColor = spotColors.includes("Dieline");
+      // Dieline validation - check for exact "Dieline" spot color
+      const hasDielineSpotColor = spotColors.some(color => 
+        color.toLowerCase() === 'dieline' || 
+        color.toLowerCase() === 'die' || 
+        color.toLowerCase() === 'cutline'
+      );
       const dielineValid = hasDieline === "no" || (hasDieline === "yes" && hasDielineSpotColor);
       const dielineError = hasDieline === "yes" && !hasDielineSpotColor 
         ? "Dieline spot color not found in the file" 
@@ -200,6 +253,7 @@ const Index = () => {
         variant: allValid ? "default" : "destructive"
       });
     } catch (error) {
+      console.error('PDF processing error:', error);
       toast({
         title: "Error processing PDF",
         description: "Please ensure you've uploaded a valid PDF file",
