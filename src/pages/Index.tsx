@@ -66,14 +66,17 @@ const Index = () => {
       const firstPage = pages[0];
 
       // Get the TrimBox dimensions (if available) or use MediaBox
-      const trimBox = firstPage.node.MediaBox || firstPage.node.TrimBox;
-      if (!trimBox) {
+      const box = firstPage.node.TrimBox?.() || firstPage.node.MediaBox?.();
+      if (!box) {
         throw new Error("Could not determine document dimensions");
       }
 
-      // Convert points to inches (1 point = 1/72 inch)
-      const trimWidth = (trimBox.width || 0) / 72;
-      const trimHeight = (trimBox.height || 0) / 72;
+      // Get the coordinates from the PDFArray [x1, y1, x2, y2]
+      const [x1, y1, x2, y2] = box.asArray().map(item => item.asNumber());
+      
+      // Calculate width and height in points, then convert to inches (1 point = 1/72 inch)
+      const trimWidth = (x2 - x1) / 72;
+      const trimHeight = (y2 - y1) / 72;
       const expectedWidth = parseFloat(width);
       const expectedHeight = parseFloat(height);
 
