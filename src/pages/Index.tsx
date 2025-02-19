@@ -9,6 +9,7 @@ import ColorProfileSelect from "@/components/ColorProfileSelect";
 import DielineSelect from "@/components/DielineSelect";
 import PreflightReport, { PreflightResult } from "@/components/PreflightReport";
 import { useToast } from "@/hooks/use-toast";
+
 const Index = () => {
   const [width, setWidth] = useState("");
   const [height, setHeight] = useState("");
@@ -54,7 +55,9 @@ const Index = () => {
       });
       return;
     }
+
     setIsProcessing(true);
+
     try {
       const arrayBuffer = await selectedFile.arrayBuffer();
       const pdfDoc = await PDFDocument.load(arrayBuffer);
@@ -68,7 +71,11 @@ const Index = () => {
       }
 
       // Get the coordinates from the PDFArray [x1, y1, x2, y2]
-      const [x1, y1, x2, y2] = box.asArray().map(item => item.asNumber());
+      const coords = box.asArray();
+      const x1 = coords[0].value as number;
+      const y1 = coords[1].value as number;
+      const x2 = coords[2].value as number;
+      const y2 = coords[3].value as number;
 
       // Calculate width and height in points, then convert to inches (1 point = 1/72 inch)
       const trimWidth = (x2 - x1) / 72;
@@ -86,23 +93,32 @@ const Index = () => {
 
       // Calculate dimensions with recommended bleed
       const recommendedBleed = 0.125; // 1/8 inch
-      const widthWithRecommendedBleed = expectedWidth + recommendedBleed * 2;
-      const heightWithRecommendedBleed = expectedHeight + recommendedBleed * 2;
+      const widthWithRecommendedBleed = expectedWidth + (recommendedBleed * 2);
+      const heightWithRecommendedBleed = expectedHeight + (recommendedBleed * 2);
       const minBleed = 0.0625; // 1/16 inch
-      const widthWithMinBleed = expectedWidth + minBleed * 2;
-      const heightWithMinBleed = expectedHeight + minBleed * 2;
+      const widthWithMinBleed = expectedWidth + (minBleed * 2);
+      const heightWithMinBleed = expectedHeight + (minBleed * 2);
 
       // Check if the trim size matches the expected dimensions
-      if (Math.abs(trimWidth - expectedWidth) <= 0.01 && Math.abs(trimHeight - expectedHeight) <= 0.01) {
+      if (Math.abs(trimWidth - expectedWidth) <= 0.01 && 
+          Math.abs(trimHeight - expectedHeight) <= 0.01) {
         dimensionsMatch = true;
       }
-      const dimensionsError = dimensionsMatch ? null : `The trim size of your file is ${trimWidth.toFixed(3)}" × ${trimHeight.toFixed(3)}", ` + `but you need to provide a file that is ${expectedWidth}" × ${expectedHeight}" with a minimum bleed of ${minBleed}", ` + `but we recommend ${recommendedBleed}" all around. This means your PDF file should be either:\n\n` + `• ${widthWithRecommendedBleed.toFixed(3)}" × ${heightWithRecommendedBleed.toFixed(3)}" (recommended ${recommendedBleed}" bleed)\n` + `• ${widthWithMinBleed.toFixed(3)}" × ${heightWithMinBleed.toFixed(3)}" (minimum ${minBleed}" bleed)`;
+
+      const dimensionsError = dimensionsMatch ? null : 
+        `The trim size of your file is ${trimWidth.toFixed(3)}" × ${trimHeight.toFixed(3)}", ` +
+        `but you need to provide a file that is ${expectedWidth}" × ${expectedHeight}" with a minimum bleed of ${minBleed}", ` +
+        `but we recommend ${recommendedBleed}" all around. This means your PDF file should be either:\n\n` +
+        `• ${widthWithRecommendedBleed.toFixed(3)}" × ${heightWithRecommendedBleed.toFixed(3)}" (recommended ${recommendedBleed}" bleed)\n` +
+        `• ${widthWithMinBleed.toFixed(3)}" × ${heightWithMinBleed.toFixed(3)}" (minimum ${minBleed}" bleed)`;
+
       const pageCountMatch = validatePageCount(pages.length, pageCount);
 
-      // Simulated color space checking (in a real implementation, you would check the actual PDF)
-      // Here we're being more precise about spot color detection
-      const spotColors = ["White_Ink"]; // Only include White_Ink for this example
-      const hasWhiteInk = spotColors.includes("White_Ink");
+      // Get actual spot colors from the PDF
+      // For now, we'll set an empty array since we need actual PDF parsing for spot colors
+      const spotColors: string[] = [];
+      const hasWhiteInk = false; // This should be determined by actual PDF inspection
+
       let colorSpaceError = null;
       let colorSpaceValid = true;
 
@@ -117,8 +133,11 @@ const Index = () => {
 
       // Dieline validation - only check for exact "Dieline" spot color
       const hasDielineSpotColor = spotColors.includes("Dieline");
-      const dielineValid = hasDieline === "no" || hasDieline === "yes" && hasDielineSpotColor;
-      const dielineError = hasDieline === "yes" && !hasDielineSpotColor ? "Dieline spot color not found in the file" : null;
+      const dielineValid = hasDieline === "no" || (hasDieline === "yes" && hasDielineSpotColor);
+      const dielineError = hasDieline === "yes" && !hasDielineSpotColor 
+        ? "Dieline spot color not found in the file" 
+        : null;
+
       const simulatedResult: PreflightResult = {
         dimensions: {
           expected: {
@@ -165,8 +184,17 @@ const Index = () => {
           error: null
         }
       };
+
       setPreflightResult(simulatedResult);
-      const allValid = simulatedResult.dimensions.isValid && simulatedResult.pageCount.isValid && simulatedResult.colorSpace.isValid && simulatedResult.resolution.isValid && simulatedResult.fonts.isValid && simulatedResult.dieline.isValid;
+      
+      const allValid = 
+        simulatedResult.dimensions.isValid && 
+        simulatedResult.pageCount.isValid &&
+        simulatedResult.colorSpace.isValid &&
+        simulatedResult.resolution.isValid &&
+        simulatedResult.fonts.isValid &&
+        simulatedResult.dieline.isValid;
+
       toast({
         title: allValid ? "Preflight passed" : "Preflight failed",
         variant: allValid ? "default" : "destructive"
@@ -181,7 +209,9 @@ const Index = () => {
       setIsProcessing(false);
     }
   };
-  return <div className="min-h-screen py-12 px-4 sm:px-6 lg:px-8 bg-slate-100">
+
+  return (
+    <div className="min-h-screen py-12 px-4 sm:px-6 lg:px-8 bg-slate-100">
       <div className="max-w-3xl mx-auto space-y-8">
         <div className="text-center">
           <h1 className="text-gray-900 text-3xl font-extrabold">PDF Preflight Tool</h1>
@@ -209,6 +239,8 @@ const Index = () => {
 
         {preflightResult && <PreflightReport result={preflightResult} />}
       </div>
-    </div>;
+    </div>
+  );
 };
+
 export default Index;
