@@ -66,7 +66,7 @@ const Index = () => {
       const firstPage = pages[0];
 
       // Get the TrimBox dimensions (if available) or use MediaBox
-      const trimBox = firstPage.node.mediaBox || firstPage.node.trimBox;
+      const trimBox = firstPage.node.MediaBox || firstPage.node.TrimBox;
       if (!trimBox) {
         throw new Error("Could not determine document dimensions");
       }
