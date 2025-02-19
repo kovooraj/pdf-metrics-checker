@@ -118,24 +118,30 @@ const PreflightReport = ({ result }: PreflightReportProps) => {
 
         <div className="space-y-2">
           <h4 className="font-medium">Color Space</h4>
-          <div className="text-sm space-y-1">
-            <p className="text-gray-500">Expected Profile</p>
-            <p>{result.colorSpace.expectedProfile}</p>
-            <p className="text-gray-500 mt-2">Detected Colors</p>
-            <p>{result.colorSpace.detectedProfile}</p>
-            {result.colorSpace.hasWhiteInk && (
-              <p className="text-gray-500">White Ink detected</p>
-            )}
-            {result.colorSpace.spotColors.length > 0 && (
-              <div>
-                <p className="text-gray-500">Spot Colors:</p>
-                <ul className="list-disc list-inside">
-                  {result.colorSpace.spotColors.map((color, index) => (
-                    <li key={index}>{color}</li>
-                  ))}
-                </ul>
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <p className="text-gray-500">Expected</p>
+              <p>{result.colorSpace.expectedProfile}</p>
+            </div>
+            <div>
+              <p className="text-gray-500">Actual</p>
+              <p>{result.colorSpace.detectedProfile}</p>
+              <div className="mt-1">
+                {result.colorSpace.hasWhiteInk && (
+                  <p className="text-gray-600">• White Ink</p>
+                )}
+                {result.colorSpace.spotColors.length > 0 && (
+                  <div className="text-gray-600">
+                    <p>• Spot Colors:</p>
+                    <ul className="list-inside pl-4">
+                      {result.colorSpace.spotColors.map((color, index) => (
+                        <li key={index}>{color}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </div>
           {!result.colorSpace.isValid && result.colorSpace.error && (
             <p className="text-error text-sm">{result.colorSpace.error}</p>
