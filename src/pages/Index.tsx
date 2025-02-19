@@ -5,18 +5,21 @@ import { Card } from "@/components/ui/card";
 import FileUpload from "@/components/FileUpload";
 import DimensionInput from "@/components/DimensionInput";
 import PageCountSelect from "@/components/PageCountSelect";
+import ColorProfileSelect from "@/components/ColorProfileSelect";
+import DielineSelect from "@/components/DielineSelect";
 import PreflightReport, { PreflightResult } from "@/components/PreflightReport";
 import { useToast } from "@/hooks/use-toast";
+
 const Index = () => {
   const [width, setWidth] = useState("");
   const [height, setHeight] = useState("");
   const [pageCount, setPageCount] = useState("");
+  const [colorProfile, setColorProfile] = useState("");
+  const [hasDieline, setHasDieline] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [preflightResult, setPreflightResult] = useState<PreflightResult | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const {
-    toast
-  } = useToast();
+  const { toast } = useToast();
 
   // Define bleed sizes
   const BLEED_SIZES = [0.125, 0.0625]; // 1/8 inch and 1/16 inch bleeds
@@ -41,8 +44,9 @@ const Index = () => {
       description: file.name
     });
   };
+
   const handleSubmit = async () => {
-    if (!selectedFile || !width || !height || !pageCount) {
+    if (!selectedFile || !width || !height || !pageCount || !colorProfile || !hasDieline) {
       toast({
         title: "Missing information",
         description: "Please fill in all required fields",
@@ -50,7 +54,9 @@ const Index = () => {
       });
       return;
     }
+
     setIsProcessing(true);
+
     try {
       const arrayBuffer = await selectedFile.arrayBuffer();
       const pdfDoc = await PDFDocument.load(arrayBuffer);
@@ -94,7 +100,31 @@ const Index = () => {
       const dimensionsError = dimensionsMatch ? null : `The file received is ${actualWidth.toFixed(3)}" × ${actualHeight.toFixed(3)}", ` + `but you need to provide a file that is ${expectedWidth}" × ${expectedHeight}" with a minimum bleed of ${minBleed}", ` + `but we recommend ${recommendedBleed}" all around. This means your PDF file should be either:\n\n` + `• ${widthWithRecommendedBleed.toFixed(3)}" × ${heightWithRecommendedBleed.toFixed(3)}" (recommended ${recommendedBleed}" bleed)\n` + `• ${widthWithMinBleed.toFixed(3)}" × ${heightWithMinBleed.toFixed(3)}" (minimum ${minBleed}" bleed)`;
       const pageCountMatch = validatePageCount(pages.length, pageCount);
 
-      // In a real implementation, these would be actual checks against the PDF
+      // Simulate color space checking (in a real implementation, you would check the actual PDF)
+      const hasWhiteInk = true; // Simulated - would actually check for White_Ink color
+      const spotColors = ["White_Ink", "Dieline"]; // Simulated - would actually check PDF
+
+      let colorSpaceError = null;
+      let colorSpaceValid = true;
+
+      // Validate color profile
+      if (colorProfile === "CMYK+WHITE" && !hasWhiteInk) {
+        colorSpaceValid = false;
+        colorSpaceError = "White ink color not found in the file";
+      } else if (colorProfile === "WHITE_ONLY" && (!hasWhiteInk || spotColors.length > 1)) {
+        colorSpaceValid = false;
+        colorSpaceError = "File contains colors other than white ink";
+      }
+
+      // Validate dieline
+      const hasDielineSpotColor = spotColors.some(color => 
+        color.toLowerCase() === "dieline"
+      );
+      const dielineValid = hasDieline === "no" || (hasDieline === "yes" && hasDielineSpotColor);
+      const dielineError = hasDieline === "yes" && !hasDielineSpotColor 
+        ? "Dieline spot color not found in the file" 
+        : null;
+
       const simulatedResult: PreflightResult = {
         dimensions: {
           expected: {
@@ -117,10 +147,18 @@ const Index = () => {
           error: pageCountMatch ? null : `Expected ${pageCount === "1" ? "1 page" : pageCount === "2" ? "2 pages" : "2 or more pages"}, but found ${pages.length} pages.`
         },
         colorSpace: {
-          isRGB: false,
-          isCMYK: true,
-          isValid: true,
-          error: null
+          expectedProfile: colorProfile,
+          detectedProfile: "CMYK",
+          hasWhiteInk,
+          spotColors,
+          isValid: colorSpaceValid,
+          error: colorSpaceError
+        },
+        dieline: {
+          expected: hasDieline === "yes",
+          hasValidDieline: hasDielineSpotColor,
+          isValid: dielineValid,
+          error: dielineError
         },
         resolution: {
           dpi: 300,
@@ -133,8 +171,17 @@ const Index = () => {
           error: null
         }
       };
+
       setPreflightResult(simulatedResult);
-      const allValid = simulatedResult.dimensions.isValid && simulatedResult.pageCount.isValid && simulatedResult.colorSpace.isValid && simulatedResult.resolution.isValid && simulatedResult.fonts.isValid;
+      
+      const allValid = 
+        simulatedResult.dimensions.isValid && 
+        simulatedResult.pageCount.isValid &&
+        simulatedResult.colorSpace.isValid &&
+        simulatedResult.resolution.isValid &&
+        simulatedResult.fonts.isValid &&
+        simulatedResult.dieline.isValid;
+
       toast({
         title: allValid ? "Preflight passed" : "Preflight failed",
         variant: allValid ? "default" : "destructive"
@@ -149,7 +196,9 @@ const Index = () => {
       setIsProcessing(false);
     }
   };
-  return <div className="min-h-screen py-12 px-4 sm:px-6 lg:px-8 bg-slate-100">
+
+  return (
+    <div className="min-h-screen py-12 px-4 sm:px-6 lg:px-8 bg-slate-100">
       <div className="max-w-3xl mx-auto space-y-8">
         <div className="text-center">
           <h1 className="text-gray-900 text-3xl font-extrabold">PDF Preflight Tool</h1>
@@ -157,19 +206,34 @@ const Index = () => {
         </div>
 
         <Card className="p-6 space-y-6 bg-white shadow-sm">
-          <FileUpload onFileSelect={handleFileSelect} className="animate-fade-in" />
+          <div className="space-y-2">
+            <FileUpload onFileSelect={handleFileSelect} className="animate-fade-in" />
+            {selectedFile && (
+              <p className="text-sm text-gray-500">Selected file: {selectedFile.name}</p>
+            )}
+          </div>
 
           <DimensionInput width={width} height={height} onWidthChange={setWidth} onHeightChange={setHeight} />
 
           <PageCountSelect value={pageCount} onChange={setPageCount} />
 
-          <Button onClick={handleSubmit} disabled={isProcessing || !selectedFile || !width || !height || !pageCount} className="w-full">
+          <ColorProfileSelect value={colorProfile} onChange={setColorProfile} />
+
+          <DielineSelect value={hasDieline} onChange={setHasDieline} />
+
+          <Button 
+            onClick={handleSubmit} 
+            disabled={isProcessing || !selectedFile || !width || !height || !pageCount || !colorProfile || !hasDieline} 
+            className="w-full"
+          >
             {isProcessing ? "Processing..." : "Check PDF"}
           </Button>
         </Card>
 
         {preflightResult && <PreflightReport result={preflightResult} />}
       </div>
-    </div>;
+    </div>
+  );
 };
+
 export default Index;
