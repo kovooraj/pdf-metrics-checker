@@ -9,7 +9,7 @@ const DielineSelect = ({
   onChange
 }: DielineSelectProps) => {
   return <div className="space-y-2">
-      <Label htmlFor="dieline">Does file have a Shape/Dieline?</Label>
+      <Label htmlFor="dieline">Does file have a Custom Shape/Dieline?</Label>
       <Select value={value} onValueChange={onChange}>
         <SelectTrigger id="dieline" className="w-full">
           <SelectValue placeholder="Select yes/no" />
