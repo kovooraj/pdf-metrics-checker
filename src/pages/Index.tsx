@@ -103,15 +103,6 @@ const Index = () => {
     };
   };
 
-  const handleFileSelect = (file: File) => {
-    setSelectedFile(file);
-    setPreflightResult(null);
-    toast({
-      title: "File selected",
-      description: file.name
-    });
-  };
-
   const analyzeColors = async (file: ArrayBuffer) => {
     try {
       // Load document with pdf.js
@@ -161,6 +152,15 @@ const Index = () => {
       console.error('Error analyzing colors with pdf.js:', error);
       throw error;
     }
+  };
+
+  const handleFileSelect = (file: File) => {
+    setSelectedFile(file);
+    setPreflightResult(null);
+    toast({
+      title: "File selected",
+      description: file.name
+    });
   };
 
   const handleSubmit = async () => {
@@ -353,6 +353,12 @@ const Index = () => {
 
     try {
       const arrayBuffer = await selectedFile.arrayBuffer();
+      console.log('Starting pdf.js analysis...');
+      const colorInfo = await analyzeColors(arrayBuffer);
+      console.log('pdf.js color analysis:', colorInfo);
+      
+      // Original pdf-lib analysis for comparison
+      console.log('Starting pdf-lib analysis...');
       const pdfDoc = await PDFDocument.load(arrayBuffer, { 
         updateMetadata: false,
         ignoreEncryption: true
