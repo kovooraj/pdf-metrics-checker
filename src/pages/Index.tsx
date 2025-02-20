@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { PDFDocument, PDFName, PDFDict } from "pdf-lib";
+import * as pdfjsLib from 'pdfjs-dist';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import FileUpload from "@/components/FileUpload";
@@ -9,6 +10,10 @@ import ColorProfileSelect from "@/components/ColorProfileSelect";
 import DielineSelect from "@/components/DielineSelect";
 import PreflightReport, { PreflightResult } from "@/components/PreflightReport";
 import { useToast } from "@/hooks/use-toast";
+
+// Set pdf.js worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+
 const Index = () => {
   const [width, setWidth] = useState("");
   const [height, setHeight] = useState("");
@@ -107,6 +112,57 @@ const Index = () => {
     });
   };
 
+  const analyzeColors = async (file: ArrayBuffer) => {
+    try {
+      // Load document with pdf.js
+      const pdf = await pdfjsLib.getDocument({ data: file }).promise;
+      const colorInfo = {
+        process: new Set<string>(),
+        spot: new Set<string>(),
+        deviceN: new Set<string>(),
+        separation: new Set<string>(),
+      };
+
+      // Analyze each page
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const operatorList = await page.getOperatorList();
+        
+        // Analyze operator list for color operations
+        for (let j = 0; j < operatorList.fnArray.length; j++) {
+          const fn = operatorList.fnArray[j];
+          const args = operatorList.argsArray[j];
+
+          // Log color operations
+          if (fn === pdfjsLib.OPS.setFillColorSpace || 
+              fn === pdfjsLib.OPS.setStrokeColorSpace) {
+            console.log('Color space operation:', {
+              function: fn,
+              arguments: args,
+            });
+          }
+
+          if (fn === pdfjsLib.OPS.setFillColor || 
+              fn === pdfjsLib.OPS.setStrokeColor) {
+            console.log('Color value operation:', {
+              function: fn,
+              arguments: args,
+            });
+          }
+        }
+
+        // Get color spaces from page resources
+        const resources = await page.getOperatorList();
+        console.log('Page resources:', resources);
+      }
+
+      return colorInfo;
+    } catch (error) {
+      console.error('Error analyzing colors with pdf.js:', error);
+      throw error;
+    }
+  };
+
   const handleSubmit = async () => {
     if (!selectedFile || !width || !height || !pageCount || !colorProfile || !hasDieline) {
       toast({
@@ -120,23 +176,19 @@ const Index = () => {
     setIsProcessing(true);
     try {
       const arrayBuffer = await selectedFile.arrayBuffer();
-      // Add debug options to see more information about the PDF structure
+      
+      // Analyze with pdf.js
+      console.log('Starting pdf.js analysis...');
+      const colorInfo = await analyzeColors(arrayBuffer);
+      console.log('pdf.js color analysis:', colorInfo);
+      
+      // Original pdf-lib analysis for comparison
+      console.log('Starting pdf-lib analysis...');
       const pdfDoc = await PDFDocument.load(arrayBuffer, { 
         updateMetadata: false,
         ignoreEncryption: true
       });
       
-      // Log the structure of the first page's resources
-      const firstPage = pdfDoc.getPages()[0];
-      const resources = firstPage.node.Resources();
-      if (resources) {
-        console.log('PDF Resources:', resources.toString());
-        const colorSpaceDict = resources.get(PDFName.of('ColorSpace'));
-        if (colorSpaceDict) {
-          console.log('ColorSpace Dictionary:', colorSpaceDict.toString());
-        }
-      }
-
       const pages = pdfDoc.getPages();
       const firstPage2 = pages[0];
 
