@@ -72,12 +72,7 @@ const Index = () => {
               spotColors.push(spotColorName);
               // Check for white ink specifically - make case insensitive and check for common variations
               const normalizedName = spotColorName.toLowerCase();
-              if (
-                normalizedName.includes('white') ||
-                normalizedName.includes('opaque white') ||
-                normalizedName.includes('blanc') ||
-                normalizedName.includes('white ink')
-              ) {
+              if (normalizedName.includes('white') || normalizedName.includes('opaque white') || normalizedName.includes('blanc') || normalizedName.includes('white ink')) {
                 hasWhiteInk = true;
                 console.log('Found white ink:', spotColorName);
               }
@@ -91,13 +86,11 @@ const Index = () => {
     console.log('All detected spot colors:', spotColors);
     console.log('Has white ink:', hasWhiteInk);
     console.log('Raw spot color names:', spotColors.map(c => `"${c}"`).join(', '));
-
     return {
       spotColors,
       hasWhiteInk
     };
   };
-
   const handleFileSelect = (file: File) => {
     setSelectedFile(file);
     setPreflightResult(null);
@@ -106,7 +99,6 @@ const Index = () => {
       description: file.name
     });
   };
-
   const handleSubmit = async () => {
     if (!selectedFile || !width || !height || !pageCount || !colorProfile || !hasDieline) {
       toast({
@@ -116,16 +108,15 @@ const Index = () => {
       });
       return;
     }
-
     setIsProcessing(true);
     try {
       const arrayBuffer = await selectedFile.arrayBuffer();
       // Add debug options to see more information about the PDF structure
-      const pdfDoc = await PDFDocument.load(arrayBuffer, { 
+      const pdfDoc = await PDFDocument.load(arrayBuffer, {
         updateMetadata: false,
         ignoreEncryption: true
       });
-      
+
       // Log the structure of the first page's resources
       const firstPage = pdfDoc.getPages()[0];
       const resources = firstPage.node.Resources();
@@ -136,7 +127,6 @@ const Index = () => {
           console.log('ColorSpace Dictionary:', colorSpaceDict.toString());
         }
       }
-
       const pages = pdfDoc.getPages();
       const firstPage2 = pages[0];
 
@@ -179,19 +169,14 @@ const Index = () => {
       if (Math.abs(trimWidth - expectedWidth) <= 0.01 && Math.abs(trimHeight - expectedHeight) <= 0.01) {
         dimensionsMatch = true;
       }
-
-      const dimensionsError = dimensionsMatch ? null : 
-        `The trim size of your file is ${trimWidth.toFixed(3)}" × ${trimHeight.toFixed(3)}", ` +
-        `but you need to provide a file that is ${expectedWidth}" × ${expectedHeight}" with a minimum bleed of ${minBleed}", ` +
-        `but we recommend ${recommendedBleed}" all around. This means your PDF file should be either:\n\n` +
-        `• ${widthWithRecommendedBleed.toFixed(3)}" × ${heightWithRecommendedBleed.toFixed(3)}" (recommended ${recommendedBleed}" bleed)\n` +
-        `• ${widthWithMinBleed.toFixed(3)}" × ${heightWithMinBleed.toFixed(3)}" (minimum ${minBleed}" bleed)`;
-
+      const dimensionsError = dimensionsMatch ? null : `The trim size of your file is ${trimWidth.toFixed(3)}" × ${trimHeight.toFixed(3)}", ` + `but you need to provide a file that is ${expectedWidth}" × ${expectedHeight}" with a minimum bleed of ${minBleed}", ` + `but we recommend ${recommendedBleed}" all around. This means your PDF file should be either:\n\n` + `• ${widthWithRecommendedBleed.toFixed(3)}" × ${heightWithRecommendedBleed.toFixed(3)}" (recommended ${recommendedBleed}" bleed)\n` + `• ${widthWithMinBleed.toFixed(3)}" × ${heightWithMinBleed.toFixed(3)}" (minimum ${minBleed}" bleed)`;
       const pageCountMatch = validatePageCount(pages.length, pageCount);
 
       // Detect spot colors and white ink
-      const { spotColors, hasWhiteInk } = detectSpotColors(pdfDoc);
-
+      const {
+        spotColors,
+        hasWhiteInk
+      } = detectSpotColors(pdfDoc);
       let colorSpaceError = null;
       let colorSpaceValid = true;
 
@@ -208,14 +193,9 @@ const Index = () => {
       }
 
       // Dieline validation - check for exact "Dieline" spot color
-      const hasDielineSpotColor = spotColors.some(color => 
-        color.toLowerCase() === 'dieline' || 
-        color.toLowerCase() === 'die' || 
-        color.toLowerCase() === 'cutline'
-      );
-      const dielineValid = hasDieline === "no" || (hasDieline === "yes" && hasDielineSpotColor);
+      const hasDielineSpotColor = spotColors.some(color => color.toLowerCase() === 'dieline' || color.toLowerCase() === 'die' || color.toLowerCase() === 'cutline');
+      const dielineValid = hasDieline === "no" || hasDieline === "yes" && hasDielineSpotColor;
       const dielineError = hasDieline === "yes" && !hasDielineSpotColor ? "Dieline spot color not found in the file" : null;
-
       const simulatedResult: PreflightResult = {
         dimensions: {
           expected: {
@@ -262,17 +242,8 @@ const Index = () => {
           error: null
         }
       };
-
       setPreflightResult(simulatedResult);
-      
-      const allValid = 
-        simulatedResult.dimensions.isValid && 
-        simulatedResult.pageCount.isValid &&
-        simulatedResult.colorSpace.isValid &&
-        simulatedResult.resolution.isValid &&
-        simulatedResult.fonts.isValid &&
-        simulatedResult.dieline.isValid;
-
+      const allValid = simulatedResult.dimensions.isValid && simulatedResult.pageCount.isValid && simulatedResult.colorSpace.isValid && simulatedResult.resolution.isValid && simulatedResult.fonts.isValid && simulatedResult.dieline.isValid;
       toast({
         title: allValid ? "Preflight passed" : "Preflight failed",
         variant: allValid ? "default" : "destructive"
@@ -288,7 +259,6 @@ const Index = () => {
       setIsProcessing(false);
     }
   };
-
   return <div className="min-h-screen py-12 px-4 sm:px-6 lg:px-8 bg-slate-100">
       <div className="max-w-3xl mx-auto space-y-8">
         <div className="text-center">
@@ -299,7 +269,7 @@ const Index = () => {
         <Card className="p-6 space-y-6 bg-white shadow-sm">
           <div className="space-y-2">
             <FileUpload onFileSelect={handleFileSelect} className="animate-fade-in" />
-            {selectedFile && <p className="text-sm text-gray-500">Selected file: {selectedFile.name}</p>}
+            {selectedFile && <p className="text-[#fa5b17] text-center text-base font-bold">Selected file: {selectedFile.name}</p>}
           </div>
 
           <DimensionInput width={width} height={height} onWidthChange={setWidth} onHeightChange={setHeight} />
@@ -319,5 +289,4 @@ const Index = () => {
       </div>
     </div>;
 };
-
 export default Index;
