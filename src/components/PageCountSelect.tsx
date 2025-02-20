@@ -1,22 +1,15 @@
-
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 interface PageCountSelectProps {
   value: string;
   onChange: (value: string) => void;
 }
-
-const PageCountSelect = ({ value, onChange }: PageCountSelectProps) => {
-  return (
-    <div className="space-y-2">
-      <Label htmlFor="pageCount">Page Count</Label>
+const PageCountSelect = ({
+  value,
+  onChange
+}: PageCountSelectProps) => {
+  return <div className="space-y-2">
+      <Label htmlFor="pageCount">Printed Sides Count</Label>
       <Select value={value} onValueChange={onChange}>
         <SelectTrigger id="pageCount" className="w-full">
           <SelectValue placeholder="Select page count" />
@@ -27,8 +20,6 @@ const PageCountSelect = ({ value, onChange }: PageCountSelectProps) => {
           <SelectItem value="multi">Multi-Page (2+ pages)</SelectItem>
         </SelectContent>
       </Select>
-    </div>
-  );
+    </div>;
 };
-
 export default PageCountSelect;
