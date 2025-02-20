@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { PDFDocument } from "pdf-lib";
+import { PDFDocument, PDFName, PDFDict } from "pdf-lib";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import FileUpload from "@/components/FileUpload";
@@ -65,18 +65,20 @@ const Index = () => {
       if (!resources) continue;
 
       // Check ColorSpace dictionary in resources
-      const colorSpaceDict = resources.lookup('ColorSpace');
+      const colorSpaceDict = resources.get(PDFName.of('ColorSpace')) as PDFDict;
       if (!colorSpaceDict) continue;
 
-      // Iterate through the ColorSpace dictionary
-      const entries = colorSpaceDict.entries();
-      for (const [_, colorSpace] of entries) {
+      // Get all keys from the ColorSpace dictionary
+      const keys = colorSpaceDict.keys();
+      for (const key of keys) {
+        const colorSpace = colorSpaceDict.get(key);
         // Check if it's a Separation color space (spot color)
-        if (colorSpace instanceof Array && colorSpace.length > 1) {
+        if (Array.isArray(colorSpace) && colorSpace.length > 1) {
           const colorSpaceType = colorSpace[0];
-          if (colorSpaceType?.toString() === '/Separation') {
+          if (colorSpaceType instanceof PDFName && colorSpaceType.toString() === '/Separation') {
             // Get the name of the spot color
-            const spotColorName = colorSpace[1]?.toString()?.replace('/', '');
+            const spotColorName = colorSpace[1] instanceof PDFName ? 
+              colorSpace[1].toString().replace('/', '') : '';
             if (spotColorName && !spotColors.includes(spotColorName)) {
               spotColors.push(spotColorName);
               // Check for white ink specifically
