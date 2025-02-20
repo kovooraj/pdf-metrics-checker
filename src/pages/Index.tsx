@@ -289,70 +289,6 @@ const Index = () => {
     }
   };
 
-  const handleLogStructure = async () => {
-    if (!selectedFile) {
-      toast({
-        title: "No file selected",
-        description: "Please select a PDF file first",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    try {
-      const arrayBuffer = await selectedFile.arrayBuffer();
-      const pdfDoc = await PDFDocument.load(arrayBuffer, { 
-        updateMetadata: false,
-        ignoreEncryption: true
-      });
-      
-      const pages = pdfDoc.getPages();
-      console.log('Total pages:', pages.length);
-
-      pages.forEach((page, index) => {
-        console.log(`\n--- Page ${index + 1} ---`);
-        const resources = page.node.Resources();
-        if (resources) {
-          console.log('Resources:', resources.toString());
-          const colorSpaceDict = resources.get(PDFName.of('ColorSpace'));
-          if (colorSpaceDict) {
-            console.log('ColorSpace Dictionary:', colorSpaceDict.toString());
-            if (colorSpaceDict instanceof PDFDict) {
-              const keys = colorSpaceDict.keys();
-              console.log('ColorSpace Keys:', keys.map(k => k.toString()));
-              
-              keys.forEach(key => {
-                const colorSpace = colorSpaceDict.get(key);
-                console.log(`ColorSpace ${key.toString()}:`, colorSpace);
-                if (Array.isArray(colorSpace)) {
-                  console.log(`ColorSpace ${key.toString()} array contents:`, 
-                    colorSpace.map(item => item.toString())
-                  );
-                }
-              });
-            }
-          } else {
-            console.log('No ColorSpace dictionary found');
-          }
-        } else {
-          console.log('No resources found');
-        }
-      });
-
-      toast({
-        title: "PDF structure logged",
-        description: "Check browser console for details",
-      });
-    } catch (error) {
-      console.error('Error logging PDF structure:', error);
-      toast({
-        title: "Error analyzing PDF",
-        description: "Could not read PDF structure",
-        variant: "destructive"
-      });
-    }
-  };
-
   return <div className="min-h-screen py-12 px-4 sm:px-6 lg:px-8 bg-slate-100">
       <div className="max-w-3xl mx-auto space-y-8">
         <div className="text-center">
@@ -363,18 +299,7 @@ const Index = () => {
         <Card className="p-6 space-y-6 bg-white shadow-sm">
           <div className="space-y-2">
             <FileUpload onFileSelect={handleFileSelect} className="animate-fade-in" />
-            {selectedFile && (
-              <div className="space-y-2">
-                <p className="text-sm text-gray-500">Selected file: {selectedFile.name}</p>
-                <Button 
-                  variant="secondary" 
-                  onClick={handleLogStructure}
-                  className="w-full"
-                >
-                  Log PDF Structure
-                </Button>
-              </div>
-            )}
+            {selectedFile && <p className="text-sm text-gray-500">Selected file: {selectedFile.name}</p>}
           </div>
 
           <DimensionInput width={width} height={height} onWidthChange={setWidth} onHeightChange={setHeight} />
