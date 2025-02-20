@@ -37,14 +37,6 @@ const Index = () => {
         return false;
     }
   };
-  const handleFileSelect = (file: File) => {
-    setSelectedFile(file);
-    setPreflightResult(null);
-    toast({
-      title: "File selected",
-      description: file.name
-    });
-  };
   const detectSpotColors = (pdfDoc: PDFDocument) => {
     const spotColors: string[] = [];
     let hasWhiteInk = false;
@@ -78,20 +70,43 @@ const Index = () => {
             const spotColorName = colorSpace[1] instanceof PDFName ? colorSpace[1].toString().replace('/', '') : '';
             if (spotColorName && !spotColors.includes(spotColorName)) {
               spotColors.push(spotColorName);
-              // Check for white ink specifically
-              if (spotColorName.toLowerCase().includes('white')) {
+              // Check for white ink specifically - make case insensitive and check for common variations
+              const normalizedName = spotColorName.toLowerCase();
+              if (
+                normalizedName.includes('white') ||
+                normalizedName.includes('opaque white') ||
+                normalizedName.includes('blanc') ||
+                normalizedName.includes('white ink')
+              ) {
                 hasWhiteInk = true;
+                console.log('Found white ink:', spotColorName);
               }
             }
           }
         }
       }
     }
+
+    // Debug logging
+    console.log('All detected spot colors:', spotColors);
+    console.log('Has white ink:', hasWhiteInk);
+    console.log('Raw spot color names:', spotColors.map(c => `"${c}"`).join(', '));
+
     return {
       spotColors,
       hasWhiteInk
     };
   };
+
+  const handleFileSelect = (file: File) => {
+    setSelectedFile(file);
+    setPreflightResult(null);
+    toast({
+      title: "File selected",
+      description: file.name
+    });
+  };
+
   const handleSubmit = async () => {
     if (!selectedFile || !width || !height || !pageCount || !colorProfile || !hasDieline) {
       toast({
@@ -101,6 +116,7 @@ const Index = () => {
       });
       return;
     }
+
     setIsProcessing(true);
     try {
       const arrayBuffer = await selectedFile.arrayBuffer();
@@ -147,16 +163,19 @@ const Index = () => {
       if (Math.abs(trimWidth - expectedWidth) <= 0.01 && Math.abs(trimHeight - expectedHeight) <= 0.01) {
         dimensionsMatch = true;
       }
-      const dimensionsError = dimensionsMatch ? null : `The trim size of your file is ${trimWidth.toFixed(3)}" × ${trimHeight.toFixed(3)}", ` + `but you need to provide a file that is ${expectedWidth}" × ${expectedHeight}" with a minimum bleed of ${minBleed}", ` + `but we recommend ${recommendedBleed}" all around. This means your PDF file should be either:\n\n` + `• ${widthWithRecommendedBleed.toFixed(3)}" × ${heightWithRecommendedBleed.toFixed(3)}" (recommended ${recommendedBleed}" bleed)\n` + `• ${widthWithMinBleed.toFixed(3)}" × ${heightWithMinBleed.toFixed(3)}" (minimum ${minBleed}" bleed)`;
+
+      const dimensionsError = dimensionsMatch ? null : 
+        `The trim size of your file is ${trimWidth.toFixed(3)}" × ${trimHeight.toFixed(3)}", ` +
+        `but you need to provide a file that is ${expectedWidth}" × ${expectedHeight}" with a minimum bleed of ${minBleed}", ` +
+        `but we recommend ${recommendedBleed}" all around. This means your PDF file should be either:\n\n` +
+        `• ${widthWithRecommendedBleed.toFixed(3)}" × ${heightWithRecommendedBleed.toFixed(3)}" (recommended ${recommendedBleed}" bleed)\n` +
+        `• ${widthWithMinBleed.toFixed(3)}" × ${heightWithMinBleed.toFixed(3)}" (minimum ${minBleed}" bleed)`;
+
       const pageCountMatch = validatePageCount(pages.length, pageCount);
 
       // Detect spot colors and white ink
-      const {
-        spotColors,
-        hasWhiteInk
-      } = detectSpotColors(pdfDoc);
-      console.log('Detected spot colors:', spotColors);
-      console.log('Has white ink:', hasWhiteInk);
+      const { spotColors, hasWhiteInk } = detectSpotColors(pdfDoc);
+
       let colorSpaceError = null;
       let colorSpaceValid = true;
 
@@ -173,9 +192,14 @@ const Index = () => {
       }
 
       // Dieline validation - check for exact "Dieline" spot color
-      const hasDielineSpotColor = spotColors.some(color => color.toLowerCase() === 'dieline' || color.toLowerCase() === 'die' || color.toLowerCase() === 'cutline');
-      const dielineValid = hasDieline === "no" || hasDieline === "yes" && hasDielineSpotColor;
+      const hasDielineSpotColor = spotColors.some(color => 
+        color.toLowerCase() === 'dieline' || 
+        color.toLowerCase() === 'die' || 
+        color.toLowerCase() === 'cutline'
+      );
+      const dielineValid = hasDieline === "no" || (hasDieline === "yes" && hasDielineSpotColor);
       const dielineError = hasDieline === "yes" && !hasDielineSpotColor ? "Dieline spot color not found in the file" : null;
+
       const simulatedResult: PreflightResult = {
         dimensions: {
           expected: {
@@ -222,8 +246,17 @@ const Index = () => {
           error: null
         }
       };
+
       setPreflightResult(simulatedResult);
-      const allValid = simulatedResult.dimensions.isValid && simulatedResult.pageCount.isValid && simulatedResult.colorSpace.isValid && simulatedResult.resolution.isValid && simulatedResult.fonts.isValid && simulatedResult.dieline.isValid;
+      
+      const allValid = 
+        simulatedResult.dimensions.isValid && 
+        simulatedResult.pageCount.isValid &&
+        simulatedResult.colorSpace.isValid &&
+        simulatedResult.resolution.isValid &&
+        simulatedResult.fonts.isValid &&
+        simulatedResult.dieline.isValid;
+
       toast({
         title: allValid ? "Preflight passed" : "Preflight failed",
         variant: allValid ? "default" : "destructive"
@@ -239,6 +272,7 @@ const Index = () => {
       setIsProcessing(false);
     }
   };
+
   return <div className="min-h-screen py-12 px-4 sm:px-6 lg:px-8 bg-slate-100">
       <div className="max-w-3xl mx-auto space-y-8">
         <div className="text-center">
