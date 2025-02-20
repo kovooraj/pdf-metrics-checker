@@ -120,12 +120,28 @@ const Index = () => {
     setIsProcessing(true);
     try {
       const arrayBuffer = await selectedFile.arrayBuffer();
-      const pdfDoc = await PDFDocument.load(arrayBuffer);
+      // Add debug options to see more information about the PDF structure
+      const pdfDoc = await PDFDocument.load(arrayBuffer, { 
+        updateMetadata: false,
+        ignoreEncryption: true
+      });
+      
+      // Log the structure of the first page's resources
+      const firstPage = pdfDoc.getPages()[0];
+      const resources = firstPage.node.Resources();
+      if (resources) {
+        console.log('PDF Resources:', resources.toString());
+        const colorSpaceDict = resources.get(PDFName.of('ColorSpace'));
+        if (colorSpaceDict) {
+          console.log('ColorSpace Dictionary:', colorSpaceDict.toString());
+        }
+      }
+
       const pages = pdfDoc.getPages();
-      const firstPage = pages[0];
+      const firstPage2 = pages[0];
 
       // Get the TrimBox dimensions (if available) or use MediaBox
-      const box = firstPage.node.TrimBox?.() || firstPage.node.MediaBox?.();
+      const box = firstPage2.node.TrimBox?.() || firstPage2.node.MediaBox?.();
       if (!box) {
         throw new Error("Could not determine document dimensions");
       }
@@ -303,4 +319,5 @@ const Index = () => {
       </div>
     </div>;
 };
+
 export default Index;
