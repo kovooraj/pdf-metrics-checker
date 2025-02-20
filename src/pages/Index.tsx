@@ -269,7 +269,7 @@ const Index = () => {
         <Card className="p-6 space-y-6 bg-white shadow-sm">
           <div className="space-y-2">
             <FileUpload onFileSelect={handleFileSelect} className="animate-fade-in" />
-            {selectedFile && <p className="text-[#fa5b17] text-base font-bold text-left">Selected file: {selectedFile.name}</p>}
+            {selectedFile && <p className="<div class=\"bg-green-500 p-3 rounded-md text-base font-bold text-left\"> text-[#214105] text-left">Selected file: {selectedFile.name}</p>}
           </div>
 
           <DimensionInput width={width} height={height} onWidthChange={setWidth} onHeightChange={setHeight} />
