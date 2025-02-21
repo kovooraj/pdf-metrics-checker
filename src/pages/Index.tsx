@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { PDFDocument, PDFName, PDFDict, PDFArray, PDFString } from "pdf-lib";
 import * as pdfjsLib from 'pdfjs-dist';
+import { pdfjsWorker } from 'pdfjs-dist/build/pdf.worker.entry';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import FileUpload from "@/components/FileUpload";
@@ -13,7 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { FileIcon } from "lucide-react";
 
 // Initialize pdf.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 const Index = () => {
   const [width, setWidth] = useState("");
