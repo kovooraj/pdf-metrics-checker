@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { PDFDocument, PDFName, PDFDict, PDFArray, PDFString } from "pdf-lib";
 import * as pdfjsLib from 'pdfjs-dist';
@@ -18,7 +17,6 @@ if (typeof window !== 'undefined') {
   const workerPath = new URL('pdfjs-dist/build/pdf.worker.min.js', import.meta.url);
   pdfjsLib.GlobalWorkerOptions.workerSrc = workerPath.pathname;
 }
-
 const Index = () => {
   const [width, setWidth] = useState("");
   const [height, setHeight] = useState("");
@@ -50,7 +48,6 @@ const Index = () => {
   const extractSpotColorsFromPDFDict = (dict: PDFDict): string[] => {
     const spotColors: string[] = [];
     const processedRefs = new Set();
-
     const extractFromDict = (dict: PDFDict) => {
       // Check for direct color space definitions
       const colorSpace = dict.get(PDFName.of('ColorSpace'));
@@ -60,9 +57,7 @@ const Index = () => {
           const value = colorSpace.get(key);
           if (value instanceof PDFArray) {
             const colorSpaceType = value.get(0);
-            if (colorSpaceType instanceof PDFName && 
-                (colorSpaceType.toString() === '/Separation' || 
-                 colorSpaceType.toString() === '/DeviceN')) {
+            if (colorSpaceType instanceof PDFName && (colorSpaceType.toString() === '/Separation' || colorSpaceType.toString() === '/DeviceN')) {
               const colorName = value.get(1);
               if (colorName instanceof PDFName) {
                 spotColors.push(colorName.toString().replace('/', ''));
@@ -92,11 +87,9 @@ const Index = () => {
         });
       }
     };
-
     extractFromDict(dict);
     return spotColors;
   };
-
   const detectSpotColors = async (pdfDoc: PDFDocument) => {
     const spotColors = new Set<string>();
     let hasWhiteInk = false;
@@ -113,15 +106,10 @@ const Index = () => {
       const pageSpotColors = extractSpotColorsFromPDFDict(resources);
       pageSpotColors.forEach(color => {
         spotColors.add(color);
-        
+
         // Check for white ink variations
         const normalizedName = color.toLowerCase();
-        if (
-          normalizedName.includes('white') ||
-          normalizedName.includes('opaque white') ||
-          normalizedName.includes('blanc') ||
-          normalizedName.includes('white ink')
-        ) {
+        if (normalizedName.includes('white') || normalizedName.includes('opaque white') || normalizedName.includes('blanc') || normalizedName.includes('white ink')) {
           hasWhiteInk = true;
           console.log('Found white ink:', color);
         }
@@ -134,13 +122,11 @@ const Index = () => {
         pageNumber: pages.indexOf(page) + 1
       });
     }
-
     return {
       spotColors: Array.from(spotColors),
       hasWhiteInk
     };
   };
-
   const handleFileSelect = (file: File) => {
     setSelectedFile(file);
     setPreflightResult(null);
@@ -158,7 +144,6 @@ const Index = () => {
       });
       return;
     }
-
     setIsProcessing(true);
     try {
       const arrayBuffer = await selectedFile.arrayBuffer();
@@ -219,7 +204,10 @@ const Index = () => {
       const pageCountMatch = validatePageCount(pages.length, pageCount);
 
       // Enhanced spot color detection
-      const { spotColors, hasWhiteInk } = await detectSpotColors(pdfDoc);
+      const {
+        spotColors,
+        hasWhiteInk
+      } = await detectSpotColors(pdfDoc);
       console.log('Detected Spot Colors:', spotColors);
       console.log('Has White Ink:', hasWhiteInk);
 
@@ -229,17 +217,11 @@ const Index = () => {
       const operatorList = await pdfJSPage.getOperatorList();
       console.log('PDF.js Analysis:', {
         operatorList,
-        colorSpaces: operatorList.fnArray
-          .map((fn, i) => ({
-            operation: fn,
-            args: operatorList.argsArray[i]
-          }))
-          .filter(op => 
-            op.operation === pdfjsLib.OPS.setFillColorSpace ||
-            op.operation === pdfjsLib.OPS.setStrokeColorSpace
-          )
+        colorSpaces: operatorList.fnArray.map((fn, i) => ({
+          operation: fn,
+          args: operatorList.argsArray[i]
+        })).filter(op => op.operation === pdfjsLib.OPS.setFillColorSpace || op.operation === pdfjsLib.OPS.setStrokeColorSpace)
       });
-
       let colorSpaceError = null;
       let colorSpaceValid = true;
 
@@ -322,7 +304,6 @@ const Index = () => {
       setIsProcessing(false);
     }
   };
-
   return <div className="min-h-screen py-12 px-4 sm:px-6 lg:px-8 bg-slate-100">
       <div className="max-w-3xl mx-auto space-y-8">
         <div className="text-center">
@@ -333,16 +314,11 @@ const Index = () => {
         <Card className="p-6 space-y-6 bg-white shadow-sm">
           <div className="space-y-2">
             <FileUpload onFileSelect={handleFileSelect} className="animate-fade-in" />
-            {selectedFile && (
-              <Button
-                variant="outline"
-                className="w-full flex items-center gap-2 text-[#fa5b17] hover:text-[#fa5b17] font-bold"
-                onClick={() => {}} // This is just a display button
-              >
+            {selectedFile && <Button variant="outline" onClick={() => {}} // This is just a display button
+          className="w-full flex items-center gap-2 font-bold text-[#1b1bb8] bg-[#abe6ff] rounded-xl">
                 <FileIcon className="w-4 h-4" />
                 {selectedFile.name}
-              </Button>
-            )}
+              </Button>}
           </div>
 
           <DimensionInput width={width} height={height} onWidthChange={setWidth} onHeightChange={setHeight} />
@@ -368,5 +344,4 @@ const Index = () => {
       </div>
     </div>;
 };
-
 export default Index;
