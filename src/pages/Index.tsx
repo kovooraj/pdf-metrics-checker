@@ -9,6 +9,8 @@ import ColorProfileSelect from "@/components/ColorProfileSelect";
 import DielineSelect from "@/components/DielineSelect";
 import PreflightReport, { PreflightResult } from "@/components/PreflightReport";
 import { useToast } from "@/hooks/use-toast";
+import { FileIcon } from "lucide-react";
+
 const Index = () => {
   const [width, setWidth] = useState("");
   const [height, setHeight] = useState("");
@@ -259,6 +261,7 @@ const Index = () => {
       setIsProcessing(false);
     }
   };
+
   return <div className="min-h-screen py-12 px-4 sm:px-6 lg:px-8 bg-slate-100">
       <div className="max-w-3xl mx-auto space-y-8">
         <div className="text-center">
@@ -269,7 +272,16 @@ const Index = () => {
         <Card className="p-6 space-y-6 bg-white shadow-sm">
           <div className="space-y-2">
             <FileUpload onFileSelect={handleFileSelect} className="animate-fade-in" />
-            {selectedFile && <p className="text-[#fa5b17] text-base font-bold text-left">Selected file: {selectedFile.name}</p>}
+            {selectedFile && (
+              <Button
+                variant="outline"
+                className="w-full flex items-center gap-2 text-[#fa5b17] hover:text-[#fa5b17] font-bold"
+                onClick={() => {}} // This is just a display button
+              >
+                <FileIcon className="w-4 h-4" />
+                {selectedFile.name}
+              </Button>
+            )}
           </div>
 
           <DimensionInput width={width} height={height} onWidthChange={setWidth} onHeightChange={setHeight} />
@@ -286,7 +298,14 @@ const Index = () => {
         </Card>
 
         {preflightResult && <PreflightReport result={preflightResult} />}
+
+        <footer className="text-center pt-8 border-t border-gray-200">
+          <p className="text-sm text-gray-600">
+            Version 1.02.0 - PDF Preflight Tool
+          </p>
+        </footer>
       </div>
     </div>;
 };
+
 export default Index;
