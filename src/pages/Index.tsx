@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { PDFDocument, PDFName, PDFDict } from "pdf-lib";
+import { PDFDocument, PDFName, PDFDict, PDFArray, PDFString } from "pdf-lib";
+import * as pdfjsLib from 'pdfjs-dist';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import FileUpload from "@/components/FileUpload";
@@ -10,6 +11,9 @@ import DielineSelect from "@/components/DielineSelect";
 import PreflightReport, { PreflightResult } from "@/components/PreflightReport";
 import { useToast } from "@/hooks/use-toast";
 import { FileIcon } from "lucide-react";
+
+// Initialize pdf.js worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 const Index = () => {
   const [width, setWidth] = useState("");
@@ -39,8 +43,58 @@ const Index = () => {
         return false;
     }
   };
-  const detectSpotColors = (pdfDoc: PDFDocument) => {
+  const extractSpotColorsFromPDFDict = (dict: PDFDict): string[] => {
     const spotColors: string[] = [];
+    const processedRefs = new Set();
+
+    const extractFromDict = (dict: PDFDict) => {
+      // Check for direct color space definitions
+      const colorSpace = dict.get(PDFName.of('ColorSpace'));
+      if (colorSpace instanceof PDFDict) {
+        const keys = colorSpace.keys();
+        keys.forEach(key => {
+          const value = colorSpace.get(key);
+          if (value instanceof PDFArray) {
+            const colorSpaceType = value.get(0);
+            if (colorSpaceType instanceof PDFName && 
+                (colorSpaceType.toString() === '/Separation' || 
+                 colorSpaceType.toString() === '/DeviceN')) {
+              const colorName = value.get(1);
+              if (colorName instanceof PDFName) {
+                spotColors.push(colorName.toString().replace('/', ''));
+              } else if (colorName instanceof PDFArray) {
+                // Handle DeviceN color space with multiple spot colors
+                for (let i = 0; i < colorName.size(); i++) {
+                  const name = colorName.get(i);
+                  if (name instanceof PDFName) {
+                    spotColors.push(name.toString().replace('/', ''));
+                  }
+                }
+              }
+            }
+          }
+        });
+      }
+
+      // Check for resources in XObjects
+      const xObjects = dict.get(PDFName.of('XObject'));
+      if (xObjects instanceof PDFDict) {
+        xObjects.keys().forEach(key => {
+          const xObject = xObjects.get(key);
+          if (xObject instanceof PDFDict && !processedRefs.has(xObject)) {
+            processedRefs.add(xObject);
+            extractFromDict(xObject);
+          }
+        });
+      }
+    };
+
+    extractFromDict(dict);
+    return spotColors;
+  };
+
+  const detectSpotColors = async (pdfDoc: PDFDocument) => {
+    const spotColors = new Set<string>();
     let hasWhiteInk = false;
 
     // Get all pages
@@ -48,51 +102,41 @@ const Index = () => {
 
     // Iterate through each page
     for (const page of pages) {
-      // Access the page's content stream
-      const contentStream = page.node.Contents();
-      if (!contentStream) continue;
-
-      // Get the resources dictionary
       const resources = page.node.Resources();
       if (!resources) continue;
 
-      // Check ColorSpace dictionary in resources
-      const colorSpaceDict = resources.get(PDFName.of('ColorSpace')) as PDFDict;
-      if (!colorSpaceDict) continue;
-
-      // Get all keys from the ColorSpace dictionary
-      const keys = colorSpaceDict.keys();
-      for (const key of keys) {
-        const colorSpace = colorSpaceDict.get(key);
-        // Check if it's a Separation color space (spot color)
-        if (Array.isArray(colorSpace) && colorSpace.length > 1) {
-          const colorSpaceType = colorSpace[0];
-          if (colorSpaceType instanceof PDFName && colorSpaceType.toString() === '/Separation') {
-            // Get the name of the spot color
-            const spotColorName = colorSpace[1] instanceof PDFName ? colorSpace[1].toString().replace('/', '') : '';
-            if (spotColorName && !spotColors.includes(spotColorName)) {
-              spotColors.push(spotColorName);
-              // Check for white ink specifically - make case insensitive and check for common variations
-              const normalizedName = spotColorName.toLowerCase();
-              if (normalizedName.includes('white') || normalizedName.includes('opaque white') || normalizedName.includes('blanc') || normalizedName.includes('white ink')) {
-                hasWhiteInk = true;
-                console.log('Found white ink:', spotColorName);
-              }
-            }
-          }
+      // Extract spot colors from page resources
+      const pageSpotColors = extractSpotColorsFromPDFDict(resources);
+      pageSpotColors.forEach(color => {
+        spotColors.add(color);
+        
+        // Check for white ink variations
+        const normalizedName = color.toLowerCase();
+        if (
+          normalizedName.includes('white') ||
+          normalizedName.includes('opaque white') ||
+          normalizedName.includes('blanc') ||
+          normalizedName.includes('white ink')
+        ) {
+          hasWhiteInk = true;
+          console.log('Found white ink:', color);
         }
-      }
+      });
+
+      // Log detailed color information
+      console.log('Page Color Spaces:', {
+        spotColors: Array.from(spotColors),
+        hasWhiteInk,
+        pageNumber: pages.indexOf(page) + 1
+      });
     }
 
-    // Debug logging
-    console.log('All detected spot colors:', spotColors);
-    console.log('Has white ink:', hasWhiteInk);
-    console.log('Raw spot color names:', spotColors.map(c => `"${c}"`).join(', '));
     return {
-      spotColors,
+      spotColors: Array.from(spotColors),
       hasWhiteInk
     };
   };
+
   const handleFileSelect = (file: File) => {
     setSelectedFile(file);
     setPreflightResult(null);
@@ -110,30 +154,26 @@ const Index = () => {
       });
       return;
     }
+
     setIsProcessing(true);
     try {
       const arrayBuffer = await selectedFile.arrayBuffer();
-      // Add debug options to see more information about the PDF structure
       const pdfDoc = await PDFDocument.load(arrayBuffer, {
         updateMetadata: false,
         ignoreEncryption: true
       });
 
-      // Log the structure of the first page's resources
-      const firstPage = pdfDoc.getPages()[0];
-      const resources = firstPage.node.Resources();
-      if (resources) {
-        console.log('PDF Resources:', resources.toString());
-        const colorSpaceDict = resources.get(PDFName.of('ColorSpace'));
-        if (colorSpaceDict) {
-          console.log('ColorSpace Dictionary:', colorSpaceDict.toString());
-        }
-      }
+      // Log detailed PDF structure
       const pages = pdfDoc.getPages();
-      const firstPage2 = pages[0];
+      const firstPage = pages[0];
+      const resources = firstPage.node.Resources();
+      console.log('PDF Structure:', {
+        totalPages: pages.length,
+        resources: resources ? resources.toString() : 'No resources found'
+      });
 
-      // Get the TrimBox dimensions (if available) or use MediaBox
-      const box = firstPage2.node.TrimBox?.() || firstPage2.node.MediaBox?.();
+      // Get dimensions
+      const box = firstPage.node.TrimBox?.() || firstPage.node.MediaBox?.();
       if (!box) {
         throw new Error("Could not determine document dimensions");
       }
@@ -174,11 +214,28 @@ const Index = () => {
       const dimensionsError = dimensionsMatch ? null : `The trim size of your file is ${trimWidth.toFixed(3)}" × ${trimHeight.toFixed(3)}", ` + `but you need to provide a file that is ${expectedWidth}" × ${expectedHeight}" with a minimum bleed of ${minBleed}", ` + `but we recommend ${recommendedBleed}" all around. This means your PDF file should be either:\n\n` + `• ${widthWithRecommendedBleed.toFixed(3)}" × ${heightWithRecommendedBleed.toFixed(3)}" (recommended ${recommendedBleed}" bleed)\n` + `• ${widthWithMinBleed.toFixed(3)}" × ${heightWithMinBleed.toFixed(3)}" (minimum ${minBleed}" bleed)`;
       const pageCountMatch = validatePageCount(pages.length, pageCount);
 
-      // Detect spot colors and white ink
-      const {
-        spotColors,
-        hasWhiteInk
-      } = detectSpotColors(pdfDoc);
+      // Enhanced spot color detection
+      const { spotColors, hasWhiteInk } = await detectSpotColors(pdfDoc);
+      console.log('Detected Spot Colors:', spotColors);
+      console.log('Has White Ink:', hasWhiteInk);
+
+      // Additional color analysis using pdf.js
+      const pdfJS = await pdfjsLib.getDocument(arrayBuffer).promise;
+      const pdfJSPage = await pdfJS.getPage(1);
+      const operatorList = await pdfJSPage.getOperatorList();
+      console.log('PDF.js Analysis:', {
+        operatorList,
+        colorSpaces: operatorList.fnArray
+          .map((fn, i) => ({
+            operation: fn,
+            args: operatorList.argsArray[i]
+          }))
+          .filter(op => 
+            op.operation === pdfjsLib.OPS.setFillColorSpace ||
+            op.operation === pdfjsLib.OPS.setStrokeColorSpace
+          )
+      });
+
       let colorSpaceError = null;
       let colorSpaceValid = true;
 
