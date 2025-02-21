@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { PDFDocument, PDFName, PDFDict, PDFArray, PDFString } from "pdf-lib";
 import * as pdfjsLib from 'pdfjs-dist';
@@ -12,9 +13,10 @@ import PreflightReport, { PreflightResult } from "@/components/PreflightReport";
 import { useToast } from "@/hooks/use-toast";
 import { FileIcon } from "lucide-react";
 
-// Initialize pdf.js worker
+// Initialize pdf.js worker safely
 if (typeof window !== 'undefined') {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.js';
+  const workerPath = new URL('pdfjs-dist/build/pdf.worker.min.js', import.meta.url);
+  pdfjsLib.GlobalWorkerOptions.workerSrc = workerPath.pathname;
 }
 
 const Index = () => {
