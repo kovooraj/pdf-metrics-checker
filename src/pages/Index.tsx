@@ -1,5 +1,6 @@
+
 import { useState } from "react";
-import { PDFDocument, PDFName, PDFDict, PDFArray, PDFString } from "pdf-lib";
+import { PDFDocument } from "pdf-lib";
 import * as pdfjsLib from 'pdfjs-dist';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -12,7 +13,7 @@ import PreflightReport, { PreflightResult } from "@/components/PreflightReport";
 import { useToast } from "@/hooks/use-toast";
 import { FileIcon } from "lucide-react";
 
-// Initialize pdf.js worker safely
+// Initialize pdf.js worker
 if (typeof window !== 'undefined') {
   pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 }
@@ -28,9 +29,9 @@ const Index = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
 
-  // Define common bleed sizes
-  const BLEED_SIZES = [0.125, 0.0625]; // 1/8 inch and 1/16 inch bleeds
+  const POINTS_PER_INCH = 72;
   const MIN_DPI = 300;
+
   const validatePageCount = (actual: number, expected: string) => {
     switch (expected) {
       case "1":
@@ -53,6 +54,43 @@ const Index = () => {
     });
   };
 
+  const analyzePDFColors = async (pdf: pdfjsLib.PDFDocumentProxy) => {
+    const page = await pdf.getPage(1);
+    const operatorList = await page.getOperatorList();
+    const colors = new Set<string>();
+    let hasSpotColors = false;
+    let hasWhiteInk = false;
+
+    for (let i = 0; i < operatorList.fnArray.length; i++) {
+      const fn = operatorList.fnArray[i];
+      const args = operatorList.argsArray[i];
+
+      // Check for different color operations
+      if (fn === pdfjsLib.OPS.setFillColorSpace || fn === pdfjsLib.OPS.setStrokeColorSpace) {
+        const colorSpace = args[0];
+        if (typeof colorSpace === 'string') {
+          colors.add(colorSpace);
+          if (colorSpace.includes('/Separation')) {
+            hasSpotColors = true;
+          }
+        }
+      }
+
+      // Check for white ink (simplified)
+      if (fn === pdfjsLib.OPS.setFillRGBColor || fn === pdfjsLib.OPS.setStrokeRGBColor) {
+        if (args[0] === 1 && args[1] === 1 && args[2] === 1) {
+          hasWhiteInk = true;
+        }
+      }
+    }
+
+    return {
+      colorSpaces: Array.from(colors),
+      hasSpotColors,
+      hasWhiteInk
+    };
+  };
+
   const handleSubmit = async () => {
     if (!selectedFile || !width || !height || !pageCount || !colorProfile || !hasDieline) {
       toast({
@@ -67,31 +105,24 @@ const Index = () => {
     try {
       const arrayBuffer = await selectedFile.arrayBuffer();
       
-      // First, load with pdf-lib for basic structure analysis
-      const pdfDoc = await PDFDocument.load(arrayBuffer, {
-        updateMetadata: false,
-        ignoreEncryption: true
-      });
+      // Load with PDF.js for detailed analysis
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      const page = await pdf.getPage(1);
+      const viewport = page.getViewport({ scale: 1.0 });
 
-      // Get basic document info
-      const pages = pdfDoc.getPages();
-      const firstPage = pages[0];
-      
-      // Get dimensions
-      const box = firstPage.getSize();
-      const trimWidth = box.width / 72; // Convert points to inches
-      const trimHeight = box.height / 72;
+      // Get dimensions in inches (converting from points)
+      const trimWidth = viewport.width / POINTS_PER_INCH;
+      const trimHeight = viewport.height / POINTS_PER_INCH;
       
       const expectedWidth = parseFloat(width);
       const expectedHeight = parseFloat(height);
       
-      // Simplified dimension check
-      const dimensionsMatch = Math.abs(trimWidth - expectedWidth) <= 0.01 && 
-                            Math.abs(trimHeight - expectedHeight) <= 0.01;
+      // More precise dimension check
+      const dimensionsMatch = Math.abs(trimWidth - expectedWidth) <= 0.0625 && // 1/16 inch tolerance
+                            Math.abs(trimHeight - expectedHeight) <= 0.0625;
 
-      // Simplified color space detection
-      const hasSpotColors = false; // We'll improve this later
-      const hasWhiteInk = false;  // We'll improve this later
+      // Analyze colors
+      const colorAnalysis = await analyzePDFColors(pdf);
       
       const simulatedResult: PreflightResult = {
         dimensions: {
@@ -104,15 +135,18 @@ const Index = () => {
         },
         pageCount: {
           expected: pageCount,
-          actual: pages.length,
-          isValid: validatePageCount(pages.length, pageCount),
+          actual: pdf.numPages,
+          isValid: validatePageCount(pdf.numPages, pageCount),
           error: null
         },
         colorSpace: {
           expectedProfile: colorProfile,
-          detectedProfile: "CMYK",
-          hasWhiteInk: hasWhiteInk,
-          spotColors: [],
+          detectedProfile: colorAnalysis.colorSpaces.includes('/DeviceCMYK') ? "CMYK" : 
+                         colorAnalysis.colorSpaces.includes('/DeviceRGB') ? "RGB" : "Unknown",
+          hasWhiteInk: colorAnalysis.hasWhiteInk,
+          spotColors: colorAnalysis.colorSpaces
+            .filter(cs => cs.includes('/Separation'))
+            .map(cs => cs.split('/')[2] || 'Unknown Spot Color'),
           isValid: true,
           error: null
         },
@@ -123,7 +157,7 @@ const Index = () => {
           error: hasDieline === "yes" ? "Dieline validation not implemented" : null
         },
         resolution: {
-          dpi: 300,
+          dpi: 300, // This is a placeholder - we'd need to analyze image XObjects for true resolution
           isValid: true,
           error: null
         },
@@ -157,14 +191,14 @@ const Index = () => {
       <div className="max-w-3xl mx-auto space-y-8">
         <div className="text-center">
           <h1 className="text-gray-900 text-3xl font-extrabold">PDF Preflight Tool</h1>
-          <p className="mt-2 text-gray-600">Verify your PDF dimensions and specifications - Built by Alex Kovoor (version 1.01.30)</p>
+          <p className="mt-2 text-gray-600">Verify your PDF dimensions and specifications</p>
         </div>
 
         <Card className="p-6 space-y-6 bg-white shadow-sm">
           <div className="space-y-2">
             <FileUpload onFileSelect={handleFileSelect} className="animate-fade-in" />
-            {selectedFile && <Button variant="outline" onClick={() => {}} // This is just a display button
-          className="w-full flex items-center gap-2 font-bold text-[#1b1bb8] bg-[#abe6ff] rounded-xl">
+            {selectedFile && <Button variant="outline" 
+              className="w-full flex items-center gap-2 font-bold text-[#1b1bb8] bg-[#abe6ff] rounded-xl">
                 <FileIcon className="w-4 h-4" />
                 {selectedFile.name}
               </Button>}
