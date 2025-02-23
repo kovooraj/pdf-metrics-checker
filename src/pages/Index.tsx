@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { PDFDocument } from "pdf-lib";
 import * as pdfjsLib from 'pdfjs-dist';
@@ -13,11 +14,6 @@ import { useToast } from "@/hooks/use-toast";
 import { FileIcon } from "lucide-react";
 import initPdfJs from "@/utils/pdfjs-init";
 
-// Initialize PDF.js when the component mounts
-useEffect(() => {
-  initPdfJs();
-}, []);
-
 const Index = () => {
   const [width, setWidth] = useState("");
   const [height, setHeight] = useState("");
@@ -28,6 +24,11 @@ const Index = () => {
   const [preflightResult, setPreflightResult] = useState<PreflightResult | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
+
+  // Initialize PDF.js when the component mounts
+  useEffect(() => {
+    initPdfJs();
+  }, []);
 
   const POINTS_PER_INCH = 72;
   const MIN_DPI = 300;
