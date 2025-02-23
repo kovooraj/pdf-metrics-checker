@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { PDFDocument, PDFName, PDFDict } from "pdf-lib";
-import * as pdfjsLib from 'pdfjs-dist';
+import { PDFDocument } from "pdf-lib";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import FileUpload from "@/components/FileUpload";
@@ -11,9 +10,6 @@ import DielineSelect from "@/components/DielineSelect";
 import PreflightReport, { PreflightResult } from "@/components/PreflightReport";
 import { useToast } from "@/hooks/use-toast";
 
-// Set pdf.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
-
 const Index = () => {
   const [width, setWidth] = useState("");
   const [height, setHeight] = useState("");
@@ -23,13 +19,12 @@ const Index = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [preflightResult, setPreflightResult] = useState<PreflightResult | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const {
-    toast
-  } = useToast();
+  const { toast } = useToast();
 
   // Define common bleed sizes
   const BLEED_SIZES = [0.125, 0.0625]; // 1/8 inch and 1/16 inch bleeds
   const MIN_DPI = 300;
+
   const validatePageCount = (actual: number, expected: string) => {
     switch (expected) {
       case "1":
@@ -40,117 +35,6 @@ const Index = () => {
         return actual >= 2;
       default:
         return false;
-    }
-  };
-  const detectSpotColors = (pdfDoc: PDFDocument) => {
-    const spotColors: string[] = [];
-    let hasWhiteInk = false;
-
-    // Get all pages
-    const pages = pdfDoc.getPages();
-
-    // Iterate through each page
-    for (const page of pages) {
-      // Access the page's content stream
-      const contentStream = page.node.Contents();
-      if (!contentStream) continue;
-
-      // Get the resources dictionary
-      const resources = page.node.Resources();
-      if (!resources) continue;
-
-      // Check ColorSpace dictionary in resources
-      const colorSpaceDict = resources.get(PDFName.of('ColorSpace')) as PDFDict;
-      if (!colorSpaceDict) continue;
-
-      // Get all keys from the ColorSpace dictionary
-      const keys = colorSpaceDict.keys();
-      for (const key of keys) {
-        const colorSpace = colorSpaceDict.get(key);
-        // Check if it's a Separation color space (spot color)
-        if (Array.isArray(colorSpace) && colorSpace.length > 1) {
-          const colorSpaceType = colorSpace[0];
-          if (colorSpaceType instanceof PDFName && colorSpaceType.toString() === '/Separation') {
-            // Get the name of the spot color
-            const spotColorName = colorSpace[1] instanceof PDFName ? colorSpace[1].toString().replace('/', '') : '';
-            if (spotColorName && !spotColors.includes(spotColorName)) {
-              spotColors.push(spotColorName);
-              // Check for white ink specifically - make case insensitive and check for common variations
-              const normalizedName = spotColorName.toLowerCase();
-              if (
-                normalizedName.includes('white') ||
-                normalizedName.includes('opaque white') ||
-                normalizedName.includes('blanc') ||
-                normalizedName.includes('white ink')
-              ) {
-                hasWhiteInk = true;
-                console.log('Found white ink:', spotColorName);
-              }
-            }
-          }
-        }
-      }
-    }
-
-    // Debug logging
-    console.log('All detected spot colors:', spotColors);
-    console.log('Has white ink:', hasWhiteInk);
-    console.log('Raw spot color names:', spotColors.map(c => `"${c}"`).join(', '));
-
-    return {
-      spotColors,
-      hasWhiteInk
-    };
-  };
-
-  const analyzeColors = async (file: ArrayBuffer) => {
-    try {
-      // Load document with pdf.js
-      const pdf = await pdfjsLib.getDocument({ data: file }).promise;
-      const colorInfo = {
-        process: new Set<string>(),
-        spot: new Set<string>(),
-        deviceN: new Set<string>(),
-        separation: new Set<string>(),
-      };
-
-      // Analyze each page
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const operatorList = await page.getOperatorList();
-        
-        // Analyze operator list for color operations
-        for (let j = 0; j < operatorList.fnArray.length; j++) {
-          const fn = operatorList.fnArray[j];
-          const args = operatorList.argsArray[j];
-
-          // Log color operations
-          if (fn === pdfjsLib.OPS.setFillColorSpace || 
-              fn === pdfjsLib.OPS.setStrokeColorSpace) {
-            console.log('Color space operation:', {
-              function: fn,
-              arguments: args,
-            });
-          }
-
-          if (fn === pdfjsLib.OPS.setFillColor || 
-              fn === pdfjsLib.OPS.setStrokeColor) {
-            console.log('Color value operation:', {
-              function: fn,
-              arguments: args,
-            });
-          }
-        }
-
-        // Get color spaces from page resources
-        const resources = await page.getOperatorList();
-        console.log('Page resources:', resources);
-      }
-
-      return colorInfo;
-    } catch (error) {
-      console.error('Error analyzing colors with pdf.js:', error);
-      throw error;
     }
   };
 
@@ -174,40 +58,22 @@ const Index = () => {
     }
 
     setIsProcessing(true);
+
     try {
       const arrayBuffer = await selectedFile.arrayBuffer();
-      
-      // Analyze with pdf.js
-      console.log('Starting pdf.js analysis...');
-      const colorInfo = await analyzeColors(arrayBuffer);
-      console.log('pdf.js color analysis:', colorInfo);
-      
-      // Original pdf-lib analysis for comparison
-      console.log('Starting pdf-lib analysis...');
-      const pdfDoc = await PDFDocument.load(arrayBuffer, { 
-        updateMetadata: false,
-        ignoreEncryption: true
-      });
-      
+      const pdfDoc = await PDFDocument.load(arrayBuffer);
       const pages = pdfDoc.getPages();
-      const firstPage2 = pages[0];
+      const firstPage = pages[0];
 
       // Get the TrimBox dimensions (if available) or use MediaBox
-      const box = firstPage2.node.TrimBox?.() || firstPage2.node.MediaBox?.();
-      if (!box) {
+      const trimBox = firstPage.node.mediaBox || firstPage.node.trimBox;
+      if (!trimBox) {
         throw new Error("Could not determine document dimensions");
       }
 
-      // Get the coordinates from the PDFArray and convert them to numbers using a safer approach
-      const coords = box.asArray();
-      const x1 = parseFloat(coords[0].toString());
-      const y1 = parseFloat(coords[1].toString());
-      const x2 = parseFloat(coords[2].toString());
-      const y2 = parseFloat(coords[3].toString());
-
-      // Calculate width and height in points, then convert to inches (1 point = 1/72 inch)
-      const trimWidth = (x2 - x1) / 72;
-      const trimHeight = (y2 - y1) / 72;
+      // Convert points to inches (1 point = 1/72 inch)
+      const trimWidth = (trimBox.width || 0) / 72;
+      const trimHeight = (trimBox.height || 0) / 72;
       const expectedWidth = parseFloat(width);
       const expectedHeight = parseFloat(height);
 
@@ -221,14 +87,15 @@ const Index = () => {
 
       // Calculate dimensions with recommended bleed
       const recommendedBleed = 0.125; // 1/8 inch
-      const widthWithRecommendedBleed = expectedWidth + recommendedBleed * 2;
-      const heightWithRecommendedBleed = expectedHeight + recommendedBleed * 2;
+      const widthWithRecommendedBleed = expectedWidth + (recommendedBleed * 2);
+      const heightWithRecommendedBleed = expectedHeight + (recommendedBleed * 2);
       const minBleed = 0.0625; // 1/16 inch
-      const widthWithMinBleed = expectedWidth + minBleed * 2;
-      const heightWithMinBleed = expectedHeight + minBleed * 2;
+      const widthWithMinBleed = expectedWidth + (minBleed * 2);
+      const heightWithMinBleed = expectedHeight + (minBleed * 2);
 
       // Check if the trim size matches the expected dimensions
-      if (Math.abs(trimWidth - expectedWidth) <= 0.01 && Math.abs(trimHeight - expectedHeight) <= 0.01) {
+      if (Math.abs(trimWidth - expectedWidth) <= 0.01 && 
+          Math.abs(trimHeight - expectedHeight) <= 0.01) {
         dimensionsMatch = true;
       }
 
@@ -241,32 +108,29 @@ const Index = () => {
 
       const pageCountMatch = validatePageCount(pages.length, pageCount);
 
-      // Detect spot colors and white ink
-      const { spotColors, hasWhiteInk } = detectSpotColors(pdfDoc);
+      // Simulated color space checking (in a real implementation, you would check the actual PDF)
+      // Here we're being more precise about spot color detection
+      const spotColors = ["White_Ink"]; // Only include White_Ink for this example
+      const hasWhiteInk = spotColors.includes("White_Ink");
 
       let colorSpaceError = null;
       let colorSpaceValid = true;
 
-      // Validate color profile with actual detected colors
+      // Validate color profile
       if (colorProfile === "CMYK+WHITE" && !hasWhiteInk) {
         colorSpaceValid = false;
         colorSpaceError = "White ink color not found in the file";
       } else if (colorProfile === "WHITE_ONLY" && (!hasWhiteInk || spotColors.length > 1)) {
         colorSpaceValid = false;
         colorSpaceError = "File contains colors other than white ink";
-      } else if (colorProfile === "CMYK+PANTONE" && spotColors.length === 0) {
-        colorSpaceValid = false;
-        colorSpaceError = "No spot colors (Pantone) found in the file";
       }
 
-      // Dieline validation - check for exact "Dieline" spot color
-      const hasDielineSpotColor = spotColors.some(color => 
-        color.toLowerCase() === 'dieline' || 
-        color.toLowerCase() === 'die' || 
-        color.toLowerCase() === 'cutline'
-      );
+      // Dieline validation - only check for exact "Dieline" spot color
+      const hasDielineSpotColor = spotColors.includes("Dieline");
       const dielineValid = hasDieline === "no" || (hasDieline === "yes" && hasDielineSpotColor);
-      const dielineError = hasDieline === "yes" && !hasDielineSpotColor ? "Dieline spot color not found in the file" : null;
+      const dielineError = hasDieline === "yes" && !hasDielineSpotColor 
+        ? "Dieline spot color not found in the file" 
+        : null;
 
       const simulatedResult: PreflightResult = {
         dimensions: {
@@ -330,7 +194,6 @@ const Index = () => {
         variant: allValid ? "default" : "destructive"
       });
     } catch (error) {
-      console.error('PDF processing error:', error);
       toast({
         title: "Error processing PDF",
         description: "Please ensure you've uploaded a valid PDF file",
@@ -341,97 +204,19 @@ const Index = () => {
     }
   };
 
-  const handleLogStructure = async () => {
-    if (!selectedFile) {
-      toast({
-        title: "No file selected",
-        description: "Please select a PDF file first",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    try {
-      const arrayBuffer = await selectedFile.arrayBuffer();
-      console.log('Starting pdf.js analysis...');
-      const colorInfo = await analyzeColors(arrayBuffer);
-      console.log('pdf.js color analysis:', colorInfo);
-      
-      // Original pdf-lib analysis for comparison
-      console.log('Starting pdf-lib analysis...');
-      const pdfDoc = await PDFDocument.load(arrayBuffer, { 
-        updateMetadata: false,
-        ignoreEncryption: true
-      });
-      
-      const pages = pdfDoc.getPages();
-      console.log('Total pages:', pages.length);
-
-      pages.forEach((page, index) => {
-        console.log(`\n--- Page ${index + 1} ---`);
-        const resources = page.node.Resources();
-        if (resources) {
-          console.log('Resources:', resources.toString());
-          const colorSpaceDict = resources.get(PDFName.of('ColorSpace'));
-          if (colorSpaceDict) {
-            console.log('ColorSpace Dictionary:', colorSpaceDict.toString());
-            if (colorSpaceDict instanceof PDFDict) {
-              const keys = colorSpaceDict.keys();
-              console.log('ColorSpace Keys:', keys.map(k => k.toString()));
-              
-              keys.forEach(key => {
-                const colorSpace = colorSpaceDict.get(key);
-                console.log(`ColorSpace ${key.toString()}:`, colorSpace);
-                if (Array.isArray(colorSpace)) {
-                  console.log(`ColorSpace ${key.toString()} array contents:`, 
-                    colorSpace.map(item => item.toString())
-                  );
-                }
-              });
-            }
-          } else {
-            console.log('No ColorSpace dictionary found');
-          }
-        } else {
-          console.log('No resources found');
-        }
-      });
-
-      toast({
-        title: "PDF structure logged",
-        description: "Check browser console for details",
-      });
-    } catch (error) {
-      console.error('Error logging PDF structure:', error);
-      toast({
-        title: "Error analyzing PDF",
-        description: "Could not read PDF structure",
-        variant: "destructive"
-      });
-    }
-  };
-
-  return <div className="min-h-screen py-12 px-4 sm:px-6 lg:px-8 bg-slate-100">
+  return (
+    <div className="min-h-screen py-12 px-4 sm:px-6 lg:px-8 bg-slate-100">
       <div className="max-w-3xl mx-auto space-y-8">
         <div className="text-center">
           <h1 className="text-gray-900 text-3xl font-extrabold">PDF Preflight Tool</h1>
-          <p className="mt-2 text-gray-600">Verify your PDF dimensions and specifications - Built by Alex Kovoor (version 1.01.30)</p>
+          <p className="mt-2 text-gray-600">Verify your PDF dimensions and specifications - Built by Alex Kovoor (version 1.0.0)</p>
         </div>
 
         <Card className="p-6 space-y-6 bg-white shadow-sm">
           <div className="space-y-2">
             <FileUpload onFileSelect={handleFileSelect} className="animate-fade-in" />
             {selectedFile && (
-              <div className="space-y-2">
-                <p className="text-sm text-gray-500">Selected file: {selectedFile.name}</p>
-                <Button 
-                  variant="secondary" 
-                  onClick={handleLogStructure}
-                  className="w-full"
-                >
-                  Log PDF Structure
-                </Button>
-              </div>
+              <p className="text-sm text-gray-500">Selected file: {selectedFile.name}</p>
             )}
           </div>
 
@@ -443,14 +228,19 @@ const Index = () => {
 
           <DielineSelect value={hasDieline} onChange={setHasDieline} />
 
-          <Button onClick={handleSubmit} disabled={isProcessing || !selectedFile || !width || !height || !pageCount || !colorProfile || !hasDieline} className="w-full">
+          <Button 
+            onClick={handleSubmit} 
+            disabled={isProcessing || !selectedFile || !width || !height || !pageCount || !colorProfile || !hasDieline} 
+            className="w-full"
+          >
             {isProcessing ? "Processing..." : "Check PDF"}
           </Button>
         </Card>
 
         {preflightResult && <PreflightReport result={preflightResult} />}
       </div>
-    </div>;
+    </div>
+  );
 };
 
 export default Index;
