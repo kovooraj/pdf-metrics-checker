@@ -19,19 +19,11 @@ export default defineConfig(({ mode }) => ({
     },
   },
   optimizeDeps: {
-    include: ['pdfjs-dist'],
-    exclude: ['pdfjs-dist/build/pdf.worker.js']
+    include: ['pdfjs-dist']
   },
   build: {
     commonjsOptions: {
-      include: [/pdfjs-dist/],
-    },
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          pdfWorker: ['pdfjs-dist/build/pdf.worker.js'],
-        },
-      },
-    },
+      include: [/pdfjs-dist/]
+    }
   }
 }));
