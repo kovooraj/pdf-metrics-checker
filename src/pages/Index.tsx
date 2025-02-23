@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { PDFDocument } from "pdf-lib";
 import * as pdfjsLib from 'pdfjs-dist';
 import { Button } from "@/components/ui/button";
@@ -12,11 +11,12 @@ import DielineSelect from "@/components/DielineSelect";
 import PreflightReport, { PreflightResult } from "@/components/PreflightReport";
 import { useToast } from "@/hooks/use-toast";
 import { FileIcon } from "lucide-react";
+import initPdfJs from "@/utils/pdfjs-init";
 
-// Initialize pdf.js worker
-if (typeof window !== 'undefined') {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
-}
+// Initialize PDF.js when the component mounts
+useEffect(() => {
+  initPdfJs();
+}, []);
 
 const Index = () => {
   const [width, setWidth] = useState("");
