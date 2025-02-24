@@ -21,9 +21,7 @@ const Index = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [preflightResult, setPreflightResult] = useState<PreflightResult | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const {
-    toast
-  } = useToast();
+  const { toast } = useToast();
 
   // Define common bleed sizes
   const BLEED_SIZES = [0.125, 0.0625]; // 1/8 inch and 1/16 inch bleeds
@@ -48,6 +46,7 @@ const Index = () => {
       description: file.name
     });
   };
+
   const handleSubmit = async () => {
     if (!selectedFile || !width || !height || !pageCount || !colorProfile || !hasDieline) {
       toast({
@@ -57,21 +56,33 @@ const Index = () => {
       });
       return;
     }
+
     setIsProcessing(true);
     try {
+      console.log("Processing file:", selectedFile.name);
       const arrayBuffer = await selectedFile.arrayBuffer();
+      console.log("File loaded as ArrayBuffer");
+
       const pdfDoc = await PDFDocument.load(arrayBuffer);
+      console.log("PDF document loaded");
+      
       const pages = pdfDoc.getPages();
+      console.log("Number of pages:", pages.length);
+      
       const firstPage = pages[0];
+      console.log("First page accessed");
 
       // Get the TrimBox dimensions (if available) or use MediaBox
       const box = firstPage.node.TrimBox || firstPage.node.MediaBox;
       if (!box) {
-        throw new Error("Could not determine document dimensions");
+        throw new Error("Could not determine document dimensions - no TrimBox or MediaBox found");
       }
+      console.log("Box information retrieved");
 
       // Get the coordinates from the PDFArray and ensure they are numbers
       const boxArray = box() as PDFArray;
+      console.log("Raw box dimensions:", boxArray.asArray());
+      
       const [x1, y1, x2, y2] = boxArray.asArray().map(item => {
         if (item instanceof PDFNumber) {
           return item.asNumber();
@@ -79,11 +90,20 @@ const Index = () => {
         return 0;
       });
 
+      console.log("Processed dimensions:", { x1, y1, x2, y2 });
+
       // Calculate width and height in points, then convert to inches (1 point = 1/72 inch)
       const trimWidth = (x2 - x1) / 72;
       const trimHeight = (y2 - y1) / 72;
       const expectedWidth = parseFloat(width);
       const expectedHeight = parseFloat(height);
+
+      console.log("Calculated dimensions:", {
+        trimWidth,
+        trimHeight,
+        expectedWidth,
+        expectedHeight
+      });
 
       // Calculate bleed from trim dimensions
       let dimensionsMatch = false;
@@ -174,23 +194,35 @@ const Index = () => {
           error: null
         }
       };
+
       setPreflightResult(simulatedResult);
-      const allValid = simulatedResult.dimensions.isValid && simulatedResult.pageCount.isValid && simulatedResult.colorSpace.isValid && simulatedResult.resolution.isValid && simulatedResult.fonts.isValid && simulatedResult.dieline.isValid;
+      
+      const allValid = simulatedResult.dimensions.isValid && 
+                      simulatedResult.pageCount.isValid && 
+                      simulatedResult.colorSpace.isValid && 
+                      simulatedResult.resolution.isValid && 
+                      simulatedResult.fonts.isValid && 
+                      simulatedResult.dieline.isValid;
+
       toast({
         title: allValid ? "Preflight passed" : "Preflight failed",
         variant: allValid ? "default" : "destructive"
       });
+
     } catch (error) {
+      console.error("PDF Processing error:", error);
       toast({
         title: "Error processing PDF",
-        description: "Please ensure you've uploaded a valid PDF file",
+        description: error instanceof Error ? error.message : "Please ensure you've uploaded a valid PDF file",
         variant: "destructive"
       });
     } finally {
       setIsProcessing(false);
     }
   };
-  return <div className="min-h-screen py-12 px-4 sm:px-6 lg:px-8 bg-slate-100">
+
+  return (
+    <div className="min-h-screen py-12 px-4 sm:px-6 lg:px-8 bg-slate-100">
       <div className="max-w-3xl mx-auto space-y-8">
         <div className="text-center">
           <h1 className="text-gray-900 text-3xl font-extrabold">PDF Preflight Tool</h1>
@@ -218,7 +250,8 @@ const Index = () => {
 
         {preflightResult && <PreflightReport result={preflightResult} file={selectedFile} />}
       </div>
-    </div>;
+    </div>
+  );
 };
 
 export default Index;
