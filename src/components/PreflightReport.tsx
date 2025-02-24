@@ -1,7 +1,7 @@
 import { Card } from "@/components/ui/card";
 import { CheckCircle, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
-import * as pdfjsLib from 'pdfjs-dist';
+import pdfjsLib from "../utils/pdfjs-init";
 
 export interface PreflightResult {
   dimensions: {
