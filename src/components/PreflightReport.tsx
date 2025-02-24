@@ -1,3 +1,4 @@
+
 import { Card } from "@/components/ui/card";
 import { CheckCircle, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -68,15 +69,19 @@ const PreflightReport = ({ result, file }: PreflightReportProps) => {
         const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
         const page = await pdf.getPage(1);
         
-        // Set a small scale for the preview (e.g., 0.3 means 30% of original size)
-        const viewport = page.getViewport({ scale: 0.3 });
+        // Set a reasonable viewport scale based on the page dimensions
+        const viewport = page.getViewport({ scale: 0.5 }); // Increased scale for better visibility
         
         const canvas = document.createElement('canvas');
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
+        const pixelRatio = window.devicePixelRatio || 1;
+        canvas.width = viewport.width * pixelRatio;
+        canvas.height = viewport.height * pixelRatio;
         
         const context = canvas.getContext('2d');
         if (!context) return;
+
+        // Scale the context to account for device pixel ratio
+        context.scale(pixelRatio, pixelRatio);
         
         await page.render({
           canvasContext: context,
@@ -110,11 +115,11 @@ const PreflightReport = ({ result, file }: PreflightReportProps) => {
       </div>
 
       {previewUrl && (
-        <div className="border rounded-lg overflow-hidden bg-gray-50 p-4 flex justify-center">
+        <div className="border rounded-lg overflow-hidden bg-gray-50 p-4 flex justify-center items-center">
           <img 
             src={previewUrl} 
             alt="PDF Preview" 
-            className="max-h-[200px] object-contain"
+            className="max-h-[300px] w-auto object-contain" // Increased max height
           />
         </div>
       )}
