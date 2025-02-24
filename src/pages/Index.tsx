@@ -26,6 +26,7 @@ const Index = () => {
   // Define common bleed sizes
   const BLEED_SIZES = [0.125, 0.0625]; // 1/8 inch and 1/16 inch bleeds
   const MIN_DPI = 300;
+
   const validatePageCount = (actual: number, expected: string) => {
     switch (expected) {
       case "1":
@@ -38,6 +39,7 @@ const Index = () => {
         return false;
     }
   };
+
   const handleFileSelect = (file: File) => {
     setSelectedFile(file);
     setPreflightResult(null);
@@ -72,29 +74,29 @@ const Index = () => {
       const firstPage = pages[0];
       console.log("First page accessed");
 
-      // Get the TrimBox dimensions (if available) or use MediaBox
-      const box = firstPage.node.TrimBox || firstPage.node.MediaBox;
-      if (!box) {
-        throw new Error("Could not determine document dimensions - no TrimBox or MediaBox found");
+      // Try to get MediaBox first, then TrimBox
+      let box;
+      if (firstPage.getMediaBox) {
+        box = firstPage.getMediaBox();
+      } else if (firstPage.node.MediaBox) {
+        box = firstPage.node.MediaBox();
+      } else {
+        throw new Error("Could not determine document dimensions - no MediaBox found");
       }
-      console.log("Box information retrieved");
 
-      // Get the coordinates from the PDFArray and ensure they are numbers
-      const boxArray = box() as PDFArray;
-      console.log("Raw box dimensions:", boxArray.asArray());
-      
-      const [x1, y1, x2, y2] = boxArray.asArray().map(item => {
-        if (item instanceof PDFNumber) {
-          return item.asNumber();
-        }
-        return 0;
-      });
+      console.log("Box information retrieved:", box);
+
+      // Get the coordinates directly from the box values
+      const x1 = box.x || 0;
+      const y1 = box.y || 0;
+      const x2 = box.width || 0;
+      const y2 = box.height || 0;
 
       console.log("Processed dimensions:", { x1, y1, x2, y2 });
 
       // Calculate width and height in points, then convert to inches (1 point = 1/72 inch)
-      const trimWidth = (x2 - x1) / 72;
-      const trimHeight = (y2 - y1) / 72;
+      const trimWidth = x2 / 72;
+      const trimHeight = y2 / 72;
       const expectedWidth = parseFloat(width);
       const expectedHeight = parseFloat(height);
 
@@ -148,6 +150,7 @@ const Index = () => {
       const hasDielineSpotColor = spotColors.includes("Dieline");
       const dielineValid = hasDieline === "no" || hasDieline === "yes" && hasDielineSpotColor;
       const dielineError = hasDieline === "yes" && !hasDielineSpotColor ? "Dieline spot color not found in the file" : null;
+
       const simulatedResult: PreflightResult = {
         dimensions: {
           expected: {
