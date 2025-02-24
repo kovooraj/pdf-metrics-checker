@@ -9,6 +9,9 @@ import ColorProfileSelect from "@/components/ColorProfileSelect";
 import DielineSelect from "@/components/DielineSelect";
 import PreflightReport, { PreflightResult } from "@/components/PreflightReport";
 import { useToast } from "@/hooks/use-toast";
+import { useEffect } from "react";
+import * as pdfjsLib from 'pdfjs-dist';
+
 const Index = () => {
   const [width, setWidth] = useState("");
   const [height, setHeight] = useState("");
@@ -207,8 +210,9 @@ const Index = () => {
           </Button>
         </Card>
 
-        {preflightResult && <PreflightReport result={preflightResult} />}
+        {preflightResult && <PreflightReport result={preflightResult} file={selectedFile} />}
       </div>
     </div>;
 };
+
 export default Index;

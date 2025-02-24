@@ -1,5 +1,7 @@
 import { Card } from "@/components/ui/card";
 import { CheckCircle, XCircle } from "lucide-react";
+import { useEffect, useState } from "react";
+import * as pdfjsLib from 'pdfjs-dist';
 
 export interface PreflightResult {
   dimensions: {
@@ -44,9 +46,11 @@ export interface PreflightResult {
 
 interface PreflightReportProps {
   result: PreflightResult;
+  file?: File;
 }
 
-const PreflightReport = ({ result }: PreflightReportProps) => {
+const PreflightReport = ({ result, file }: PreflightReportProps) => {
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const isValid = 
     result.dimensions.isValid && 
     result.pageCount.isValid &&
@@ -54,6 +58,39 @@ const PreflightReport = ({ result }: PreflightReportProps) => {
     result.resolution.isValid &&
     result.fonts.isValid &&
     result.dieline.isValid;
+
+  useEffect(() => {
+    const loadPdfPreview = async () => {
+      if (!file) return;
+      
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        const page = await pdf.getPage(1);
+        
+        // Set a small scale for the preview (e.g., 0.3 means 30% of original size)
+        const viewport = page.getViewport({ scale: 0.3 });
+        
+        const canvas = document.createElement('canvas');
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        
+        const context = canvas.getContext('2d');
+        if (!context) return;
+        
+        await page.render({
+          canvasContext: context,
+          viewport: viewport
+        }).promise;
+        
+        setPreviewUrl(canvas.toDataURL());
+      } catch (error) {
+        console.error('Error generating PDF preview:', error);
+      }
+    };
+
+    loadPdfPreview();
+  }, [file]);
 
   return (
     <Card className="p-6 space-y-4 animate-slide-up">
@@ -71,6 +108,16 @@ const PreflightReport = ({ result }: PreflightReportProps) => {
           </div>
         )}
       </div>
+
+      {previewUrl && (
+        <div className="border rounded-lg overflow-hidden bg-gray-50 p-4 flex justify-center">
+          <img 
+            src={previewUrl} 
+            alt="PDF Preview" 
+            className="max-h-[200px] object-contain"
+          />
+        </div>
+      )}
 
       <div className="space-y-4">
         <div className="space-y-2">
