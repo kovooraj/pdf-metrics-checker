@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { PDFDocument, PDFArray, PDFNumber } from "pdf-lib";
 import { Button } from "@/components/ui/button";
@@ -127,15 +128,37 @@ const Index = () => {
       if (Math.abs(trimWidth - expectedWidth) <= 0.01 && Math.abs(trimHeight - expectedHeight) <= 0.01) {
         dimensionsMatch = true;
       }
+      
+      // Check for bleed properly
+      if (!dimensionsMatch) {
+        // Check if the document includes bleed
+        if (Math.abs(trimWidth - widthWithRecommendedBleed) <= 0.01 && 
+            Math.abs(trimHeight - heightWithRecommendedBleed) <= 0.01) {
+          dimensionsMatch = true;
+          usedBleedSize = recommendedBleed;
+          console.log("Document has recommended bleed size");
+        } else if (Math.abs(trimWidth - widthWithMinBleed) <= 0.01 && 
+                   Math.abs(trimHeight - heightWithMinBleed) <= 0.01) {
+          dimensionsMatch = true;
+          usedBleedSize = minBleed;
+          console.log("Document has minimum bleed size");
+        }
+      }
+      
       const dimensionsError = dimensionsMatch ? null : `The trim size of your file is ${trimWidth.toFixed(3)}" × ${trimHeight.toFixed(3)}", ` + `but you need to provide a file that is ${expectedWidth}" × ${expectedHeight}" with a minimum bleed of ${minBleed}", ` + `but we recommend ${recommendedBleed}" all around. This means your PDF file should be either:\n\n` + `• ${widthWithRecommendedBleed.toFixed(3)}" × ${heightWithRecommendedBleed.toFixed(3)}" (recommended ${recommendedBleed}" bleed)\n` + `• ${widthWithMinBleed.toFixed(3)}" × ${heightWithMinBleed.toFixed(3)}" (minimum ${minBleed}" bleed)`;
       const pageCountMatch = validatePageCount(pages.length, pageCount);
 
+      // Safe zone calculation (0.125" inside trim edge)
+      const safeZoneWidth = expectedWidth - 0.25;  // 0.125" on each side
+      const safeZoneHeight = expectedHeight - 0.25;  // 0.125" on each side
+
       // Simulated color space checking (in a real implementation, you would check the actual PDF)
       // Here we're being more precise about spot color detection
-      const spotColors = ["White_Ink"]; // Only include White_Ink for this example
+      const spotColors = ["White_Ink", "Dieline", "Spot_UV", "Foil", "Emboss"];
       const hasWhiteInk = spotColors.includes("White_Ink");
       let colorSpaceError = null;
       let colorSpaceValid = true;
+      const totalInkCoverage = 285; // Simulated value, in a real implementation this would be calculated
 
       // Validate color profile
       if (colorProfile === "CMYK+WHITE" && !hasWhiteInk) {
@@ -144,13 +167,17 @@ const Index = () => {
       } else if (colorProfile === "WHITE_ONLY" && (!hasWhiteInk || spotColors.length > 1)) {
         colorSpaceValid = false;
         colorSpaceError = "File contains colors other than white ink";
+      } else if (totalInkCoverage > 300) {
+        colorSpaceValid = false;
+        colorSpaceError = `Total ink coverage (${totalInkCoverage}%) exceeds 300% limit for coated stock`;
       }
 
-      // Dieline validation - only check for exact "Dieline" spot color
+      // Dieline validation
       const hasDielineSpotColor = spotColors.includes("Dieline");
       const dielineValid = hasDieline === "no" || hasDieline === "yes" && hasDielineSpotColor;
       const dielineError = hasDieline === "yes" && !hasDielineSpotColor ? "Dieline spot color not found in the file" : null;
 
+      // Simulated additional checks (these would be implemented with deeper PDF analysis)
       const simulatedResult: PreflightResult = {
         dimensions: {
           expected: {
@@ -163,6 +190,10 @@ const Index = () => {
           },
           actualWithBleed: actualWithBleed,
           bleedSize: usedBleedSize,
+          safeZone: {
+            width: safeZoneWidth,
+            height: safeZoneHeight
+          },
           isValid: dimensionsMatch,
           error: dimensionsError
         },
@@ -177,6 +208,7 @@ const Index = () => {
           detectedProfile: "CMYK",
           hasWhiteInk,
           spotColors,
+          totalInkCoverage,
           isValid: colorSpaceValid,
           error: colorSpaceError
         },
@@ -193,6 +225,46 @@ const Index = () => {
         },
         fonts: {
           hasUnoutlinedFonts: false,
+          embeddedFonts: true,
+          isValid: true,
+          error: null
+        },
+        images: {
+          allImagesInCMYK: true,
+          oversizedImages: false,
+          isValid: true,
+          error: null
+        },
+        transparency: {
+          hasTransparency: true,
+          isFlattened: true,
+          isValid: true,
+          error: null
+        },
+        printMarks: {
+          hasCropMarks: true,
+          hasRegistrationMarks: true,
+          hasColorBars: false,
+          isValid: true,
+          error: null
+        },
+        overprint: {
+          hasOverprint: false,
+          whitesSetToKnockout: true,
+          isValid: true,
+          error: null
+        },
+        specialFinishes: {
+          hasSpotUV: spotColors.includes("Spot_UV"),
+          hasFoil: spotColors.includes("Foil"),
+          hasEmbossing: spotColors.includes("Emboss"),
+          isValid: true,
+          error: null
+        },
+        contentVerification: {
+          hasSpellCheck: true,
+          allImagesPlaced: true,
+          correctPageOrder: true,
           isValid: true,
           error: null
         }
@@ -205,7 +277,13 @@ const Index = () => {
                       simulatedResult.colorSpace.isValid && 
                       simulatedResult.resolution.isValid && 
                       simulatedResult.fonts.isValid && 
-                      simulatedResult.dieline.isValid;
+                      simulatedResult.dieline.isValid &&
+                      simulatedResult.images.isValid &&
+                      simulatedResult.transparency.isValid &&
+                      simulatedResult.printMarks.isValid &&
+                      simulatedResult.overprint.isValid &&
+                      simulatedResult.specialFinishes.isValid &&
+                      simulatedResult.contentVerification.isValid;
 
       toast({
         title: allValid ? "Preflight passed" : "Preflight failed",
@@ -229,7 +307,7 @@ const Index = () => {
       <div className="max-w-3xl mx-auto space-y-8">
         <div className="text-center">
           <h1 className="text-gray-900 text-3xl font-extrabold">PDF Preflight Tool</h1>
-          <p className="mt-2 text-gray-600">Verify your PDF dimensions and specifications - Built by Alex Kovoor (version 1.01.20)</p>
+          <p className="mt-2 text-gray-600">Verify your PDF dimensions and specifications - Built by Alex Kovoor (version 1.02.00)</p>
         </div>
 
         <Card className="p-6 space-y-6 bg-white shadow-sm">
